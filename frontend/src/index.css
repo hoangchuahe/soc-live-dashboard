@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #020617;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+}
+
+/* D3 axis text */
+.axis text {
+  fill: #64748b;
+  font-size: 11px;
+}
+.axis path,
+.axis line {
+  stroke: #1e293b;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+/* Pulse animation for critical nodes */
+@keyframes pulse-ring {
+  0%   { opacity: 0.8; transform: scale(1); }
+  50%  { opacity: 0.3; transform: scale(1.4); }
+  100% { opacity: 0.8; transform: scale(1); }
+}
+.pulse-ring { animation: pulse-ring 1.5s ease-in-out infinite; }
+
+/* Scanline effect on cards */
+.scanline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.05) 2px,
+    rgba(0, 0, 0, 0.05) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
