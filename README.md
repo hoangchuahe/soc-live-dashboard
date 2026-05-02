@@ -1,13 +1,28 @@
 # SOC Live Dashboard
 
+[![CI](https://github.com/hoangchuahe/soc-live-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/hoangchuahe/soc-live-dashboard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg)](https://www.typescriptlang.org/)
+[![Tests](https://img.shields.io/badge/tests-39%20passing-brightgreen.svg)](backend/tests)
+
 A real-time Security Operations Centre dashboard with **Sigma-style detection
-rules**, **risk-based alerting**, and **ECS-formatted events** — built end-to-end
-with FastAPI WebSockets, React, and D3.js.
+rules**, **risk-based alerting**, **JWT auth + RBAC**, and **ECS-formatted events**
+— built end-to-end with FastAPI WebSockets, React, and D3.js.
 
 This is a portfolio project that puts the architecture patterns I used at PNO
 (real-time WebSocket ingestion, D3 force-graphs, geospatial overlays) on top of
 the patterns real SIEMs use today (ECS schema, Sigma rules, threshold detection,
 RBA risk scoring, Prometheus metrics).
+
+> **📸 Screenshot/GIF goes here** — record a 5-second clip of the running dashboard
+> with `OBS Studio` or `ScreenToGif`, save as `docs/screenshot.png` or
+> `docs/demo.gif`, and replace this placeholder. Recommended: include the geo
+> map with arcs firing + a few alerts scrolling in the feed.
+>
+> ```markdown
+> ![SOC Live Dashboard](docs/demo.gif)
+> ```
 
 ---
 
@@ -30,22 +45,26 @@ RBA risk scoring, Prometheus metrics).
 
 ## How it compares to real SIEMs
 
-| Capability                       | This project | Splunk ES | Elastic Security | Wazuh | Sentinel |
-|----------------------------------|:------------:|:---------:|:----------------:|:-----:|:--------:|
-| ECS-shaped events                |      ✓       |     —     |        ✓         |   —   |    —     |
-| Sigma-style YAML detection rules |      ✓       |     ✓¹    |        ✓¹        |   —   |    —     |
-| Threshold / sliding-window detection |  ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
-| MITRE ATT&CK tagging             |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
-| Risk-Based Alerting              |      ✓       |     ✓     |       ~²         |   —   |    ✓     |
-| Real-time push to UI             |      ✓ (WS)  |   ✓ (XHR) |     ✓ (XHR)      |   ✓   |    ✓     |
-| Real CVE/threat intel feed       |    ✓ NVD     |     ✓     |        ✓         |   —   |    ✓     |
-| Geospatial attack map            |      ✓       |     ✓     |        ✓         |   —   |    ✓     |
-| Custom query language            |      —       |     SPL   |    KQL/EQL       |   —   |   KQL    |
-| Multi-tenant / RBAC              |      —       |     ✓     |        ✓         |   ✓   |    ✓     |
-| Distributed ingestion            |      —       |     ✓     |        ✓         |   ✓   |    ✓     |
+| Capability                           | This project | Splunk ES | Elastic Security | Wazuh | Sentinel |
+|--------------------------------------|:------------:|:---------:|:----------------:|:-----:|:--------:|
+| ECS-shaped events                    |      ✓       |     —     |        ✓         |   —   |    —     |
+| Sigma-style YAML detection rules³    |      ✓       |     ✓¹    |        ✓¹        |   —   |    —     |
+| Threshold / sliding-window detection |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
+| MITRE ATT&CK tagging                 |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
+| Risk-Based Alerting                  |      ✓       |     ✓     |       ~²         |   —   |    ✓     |
+| Real-time push to UI                 |      ✓ (WS)  |   ✓ (XHR) |     ✓ (XHR)      |   ✓   |    ✓     |
+| Real CVE / threat intel feed         |    ✓ NVD     |     ✓     |        ✓         |   —   |    ✓     |
+| Geospatial attack map                |      ✓       |     ✓     |        ✓         |   —   |    ✓     |
+| JWT auth + RBAC                      |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
+| Alert lifecycle (ack / close)        |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
+| Persistent storage                   |   ✓ SQLite   |  ✓ index  |     ✓ index      | ✓ index | ✓ LA  |
+| Custom query language                |      —       |     SPL   |    KQL/EQL       |   —   |   KQL    |
+| Multi-tenant / RBAC                  |      —       |     ✓     |        ✓         |   ✓   |    ✓     |
+| Distributed ingestion                |      —       |     ✓     |        ✓         |   ✓   |    ✓     |
 
 ¹ via Sigma compilers (`pySigma`, Splunk app)
 ² via Risk Engine in beta
+³ This project ships 7 example rules — not a comparable corpus to Splunk ESCU's hundreds
 
 The detection-engine, RBA, and ECS pieces are the *substance* — the rest of the
 gap (multi-tenant, distributed) is intentionally out of scope. See
@@ -162,21 +181,80 @@ npm run dev   # → http://localhost:5173
 
 ## API surface
 
+Public (no auth):
+
 | Method | Path | What it returns |
 |---|---|---|
-| GET | `/health` | service + ES + rule-count status |
+| GET | `/health` | service + ES + rule-count + DB status |
 | GET | `/metrics` | Prometheus exposition (events_ingested, detections_fired, ws_clients) |
 | GET | `/api/topology` | network nodes + edges |
 | GET | `/api/events?since=<id>&limit=N` | ring-buffer events with replay cursor |
 | GET | `/api/alerts` | ring-buffer of fired detections |
+| GET | `/api/alerts/lifecycle?status=...` | alert workflow status (new / ack / in_progress / closed) |
 | GET | `/api/rules` | loaded Sigma rules + their fire counts |
 | GET | `/api/risk/top?n=10` | top-N risky entities by RBA score |
 | GET | `/api/cves` | live CVE feed from NVD |
 | GET | `/api/mitre/tactics` | per-tactic event counts for the heatmap |
 | GET | `/api/search?q=...` | ElasticSearch passthrough (if available) |
+| POST | `/api/auth/login` | exchange `{username, password}` for JWT |
 | WS  | `/ws` | live frame stream `{tick, metrics, event, alerts}` |
 
+Authenticated (Bearer token from `/api/auth/login`):
+
+| Method | Path | Required role | What it does |
+|---|---|---|---|
+| GET  | `/api/auth/me` | any | current user info |
+| POST | `/api/alerts/{id}/ack` | any | acknowledge an alert (Tier 1 analyst workflow) |
+| POST | `/api/alerts/{id}/close` | **admin** | close an alert (Tier 2 / admin workflow) |
+| POST | `/api/rules/reload` | **admin** | hot-reload Sigma YAML rules from disk |
+| POST | `/api/admin/prune?days=N` | **admin** | delete events older than N days |
+
 OpenAPI spec auto-generated at `/docs` (Swagger UI) and `/redoc`.
+
+### Demo credentials
+
+```bash
+curl -X POST http://localhost:8000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username": "admin", "password": "admin"}'
+# → {"access_token": "eyJhbGc...", "role": "admin", "expires_in": 28800}
+
+# Use the token:
+curl -H 'Authorization: Bearer eyJhbGc...' http://localhost:8000/api/auth/me
+```
+
+Override credentials via env vars `ADMIN_PASSWORD`, `VIEWER_PASSWORD`,
+`JWT_SECRET` before deploying.
+
+---
+
+## Deployment (Fly.io — recommended free tier)
+
+```bash
+# install flyctl
+curl -L https://fly.io/install.sh | sh
+
+# from repo root
+fly launch --name soc-live-dashboard --no-deploy
+fly secrets set \
+  JWT_SECRET="$(openssl rand -hex 32)" \
+  ADMIN_PASSWORD="$(openssl rand -hex 16)" \
+  VIEWER_PASSWORD="viewer"
+fly deploy
+```
+
+The app fits comfortably in Fly's free tier (256 MB RAM, shared CPU). The
+SQLite database persists via a Fly volume; configure with:
+
+```bash
+fly volumes create soc_data --size 1
+fly config save
+# add to fly.toml:  [mounts] source = "soc_data"  destination = "/data"
+# update DATABASE_URL: sqlite+aiosqlite:////data/soc.db
+```
+
+For Render or Railway, point the service at `./backend` with start command
+`uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 
 ---
 
@@ -188,23 +266,31 @@ OpenAPI spec auto-generated at `/docs` (Swagger UI) and `/redoc`.
 
 ---
 
-## What I built vs what AI generated
+## How I worked with AI tooling
 
-The architecture, the Sigma rule format, the detection engine, the RBA decay
-model, the ECS schema decision — those are mine. AI was used to generate
-boilerplate (Pydantic schemas, D3 axis setup, Docker config, Tailwind classes)
-and accelerate the typing-out part. Every file was reviewed before commit, and
-the test suite was written *first* for the detection engine to pin its
-contract before the implementation evolved.
+The architectural decisions here are mine: choosing ECS as the schema baseline
+over OCSF, picking sliding-window threshold detection over batch correlation,
+the per-`(rule, entity)` state keying, the Splunk-style RBA decay model. I
+have an LLM-evaluation background (Outlier / Scale AI) so I treat AI output as
+a first draft and a typing accelerator — never as a finished design.
 
-The places the AI's first attempt was wrong and got rewritten:
+Where AI was used effectively:
 
-- The geo projection initially returned `null` for some coordinates without
-  guarding — fixed with explicit `if (!targetXY) return` checks
-- The ring-buffer replay endpoint was originally a list slice; rewrote to a
-  cursor-based scan so reconnecting clients don't double-receive events
-- Detection-engine state was initially per-rule (global); rewrote keyed by
-  `(rule_id, entity)` so two attackers don't collide in one window
+- Boilerplate generation — Pydantic models, D3 axis scaffolding, Docker config,
+  Tailwind classes, FastAPI endpoint stubs
+- Translating between specs — looking up ECS field names, OCSF mappings, MITRE
+  technique IDs
+
+Where I owned the work directly:
+
+- The pipeline shape (Simulator → Engine → RiskTracker → ring buffer → WS) and
+  the decision to keep state in-process for this scope
+- The Sigma-subset YAML format and the loader that parses it
+- The detection-engine contract (`evaluate(event) → list[Detection]`) and the
+  per-rule unit tests pinning that contract
+- The RBA decay maths (exponential, 30-min half-life)
+- All trade-off documentation in `docs/ARCHITECTURE.md` ("what's deliberately
+  not in this build")
 
 ---
 
