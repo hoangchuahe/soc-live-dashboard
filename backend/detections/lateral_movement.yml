@@ -1,0 +1,23 @@
+title: Suspicious Lateral Movement
+id: rule-0003-lateral-rdp
+description: >
+  RDP / SMB / WMI session originating from a workstation toward a server segment —
+  combined with a non-business-hours timestamp suggests lateral movement.
+author: Pham Nhat Hoang
+
+logsource:
+  category: authentication
+
+detection:
+  selection:
+    event.category: authentication
+    event.action: lateral_movement
+  condition: selection
+
+mitre:
+  tactic: Lateral Movement
+  technique_id: T1021.001
+  technique_name: Remote Desktop Protocol
+
+severity: high
+risk_weight: 30

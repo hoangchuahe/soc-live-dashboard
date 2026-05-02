@@ -1,0 +1,22 @@
+title: Web Exploitation Attempt
+id: rule-0007-web-exploit
+description: >
+  Inbound payload matching known exploitation signatures (Log4Shell, SQLi, RCE, SSRF).
+  Triggered at the WAF or IDS layer.
+author: Pham Nhat Hoang
+
+logsource:
+  category: intrusion_detection
+
+detection:
+  selection:
+    event.category: intrusion_detection
+  condition: selection
+
+mitre:
+  tactic: Initial Access
+  technique_id: T1190
+  technique_name: Exploit Public-Facing Application
+
+severity: high
+risk_weight: 25

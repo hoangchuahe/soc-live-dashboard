@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
 import * as d3 from 'd3'
-import type { SecurityEvent } from '../types'
+import type { EcsEvent } from '../types'
+import { ecs } from '../types'
 
 interface Props {
-  events: SecurityEvent[]
+  events: EcsEvent[]
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -31,7 +32,7 @@ export function EventTimeline({ events }: Props) {
     const svg = d3.select(svgRef.current)
     svg.selectAll('*').remove()
 
-    const times = events.map(e => new Date(e.timestamp).getTime())
+    const times = events.map(e => new Date(e['@timestamp']).getTime())
     const extent = d3.extent(times) as [number, number]
     const xDomain: [number, number] = extent[0] === extent[1]
       ? [extent[0] - 60_000, extent[0] + 60_000]
@@ -41,7 +42,6 @@ export function EventTimeline({ events }: Props) {
 
     const g = svg.append('g')
 
-    // Axis
     g.append('line')
       .attr('x1', MARGIN.left).attr('x2', MARGIN.left + iW)
       .attr('y1', midY).attr('y2', midY)
@@ -53,16 +53,15 @@ export function EventTimeline({ events }: Props) {
       .call(ax => { ax.select('.domain').remove() })
       .selectAll('text').style('fill', '#475569').style('font-size', '9px')
 
-    // Event dots
-    const dot = g.selectAll<SVGCircleElement, SecurityEvent>('circle')
+    const dot = g.selectAll<SVGCircleElement, EcsEvent>('circle')
       .data(events)
       .join('circle')
-      .attr('cx', d => x(new Date(d.timestamp)))
-      .attr('cy', midY)
-      .attr('r', 5)
-      .attr('fill', d => SEV_COLOR[d.severity] ?? '#64748b')
-      .attr('stroke', '#0f172a')
-      .attr('stroke-width', 1.5)
+      .attr('cx', d => x(new Date(d['@timestamp'])))
+      .attr('cy', d => ecs.isAlert(d) ? midY - 12 : midY)
+      .attr('r', d => ecs.isAlert(d) ? 7 : 5)
+      .attr('fill', d => SEV_COLOR[ecs.severity(d)] ?? '#64748b')
+      .attr('stroke', d => ecs.isAlert(d) ? '#06b6d4' : '#0f172a')
+      .attr('stroke-width', d => ecs.isAlert(d) ? 2 : 1.5)
       .style('cursor', 'pointer')
 
     const tooltip = d3.select(tooltipRef.current)
@@ -72,16 +71,16 @@ export function EventTimeline({ events }: Props) {
         tooltip
           .style('opacity', '1')
           .style('left', `${event.offsetX + 12}px`)
-          .style('top', `${event.offsetY - 40}px`)
+          .style('top', `${event.offsetY - 50}px`)
           .html(`
-            <div class="text-xs font-bold text-slate-200">${d.type}</div>
-            <div class="text-xs text-slate-400">${d.source_ip}</div>
+            <div class="text-xs font-bold text-slate-200">${d.rule?.name ?? ecs.type(d)}</div>
+            <div class="text-xs text-slate-400">${ecs.source(d)} · ${ecs.country(d)}</div>
             <div class="text-xs text-slate-500">${d.message}</div>
+            ${ecs.technique(d) ? `<div class="text-[10px] text-purple-400 mt-1">${ecs.technique(d)} · ${ecs.tactic(d) ?? ''}</div>` : ''}
           `)
       })
       .on('mouseleave', () => tooltip.style('opacity', '0'))
 
-    // Severity legend
     const legend = g.append('g').attr('transform', `translate(${MARGIN.left},8)`)
     Object.entries(SEV_COLOR).forEach(([sev, color], i) => {
       const grp = legend.append('g').attr('transform', `translate(${i * 72},0)`)
@@ -89,6 +88,11 @@ export function EventTimeline({ events }: Props) {
       grp.append('text').attr('x', 8).attr('dominant-baseline', 'central')
         .style('fill', '#64748b').style('font-size', '9px').text(sev)
     })
+    // Alert legend
+    const alertLeg = legend.append('g').attr('transform', `translate(${4 * 72 + 16},0)`)
+    alertLeg.append('circle').attr('r', 5).attr('fill', '#ef4444').attr('stroke', '#06b6d4').attr('stroke-width', 2)
+    alertLeg.append('text').attr('x', 10).attr('dominant-baseline', 'central')
+      .style('fill', '#06b6d4').style('font-size', '9px').text('alert (rule fired)')
   }, [events])
 
   return (

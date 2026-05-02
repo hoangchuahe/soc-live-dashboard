@@ -1,0 +1,31 @@
+title: Authentication Brute Force
+id: rule-0001-auth-brute
+description: >
+  Multiple failed authentication attempts from a single source within a short window —
+  indicative of password guessing or credential stuffing.
+author: Pham Nhat Hoang
+status: experimental
+date: 2026-05-02
+references:
+  - https://attack.mitre.org/techniques/T1110/001/
+
+logsource:
+  category: authentication
+
+detection:
+  selection:
+    event.category: authentication
+    event.outcome: failure
+  threshold:
+    by: source.ip
+    count: 5
+    window_seconds: 60
+  condition: selection AND threshold
+
+mitre:
+  tactic: Credential Access
+  technique_id: T1110.001
+  technique_name: Password Guessing
+
+severity: high
+risk_weight: 25

@@ -1,7 +1,8 @@
-import type { SecurityEvent } from '../types'
+import type { EcsEvent } from '../types'
+import { ecs } from '../types'
 
 interface Props {
-  events: SecurityEvent[]
+  events: EcsEvent[]
 }
 
 const SEV_BADGE: Record<string, string> = {
@@ -26,19 +27,36 @@ export function AlertFeed({ events }: Props) {
 
   return (
     <ul className="overflow-y-auto h-full divide-y divide-slate-800/60">
-      {[...events].reverse().map(e => (
-        <li key={e.id} className="px-4 py-2.5 hover:bg-slate-800/40 transition-colors">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${SEV_BADGE[e.severity]}`}>
-              {e.severity.toUpperCase()}
-            </span>
-            <span className="text-[10px] text-slate-500 tabular-nums">{fmtTime(e.timestamp)}</span>
-          </div>
-          <div className="text-xs font-semibold text-slate-300 truncate">{e.type}</div>
-          <div className="text-[11px] text-slate-500 truncate">{e.message}</div>
-          <div className="text-[10px] text-slate-600 mt-0.5">{e.source_ip}{e.destination_ip ? ` → ${e.destination_ip}` : ''}</div>
-        </li>
-      ))}
+      {[...events].reverse().map(e => {
+        const sev = ecs.severity(e)
+        return (
+          <li key={e.event.id} className="px-4 py-2.5 hover:bg-slate-800/40 transition-colors">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-1.5">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${SEV_BADGE[sev]}`}>
+                  {sev.toUpperCase()}
+                </span>
+                {ecs.isAlert(e) && (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                    ALERT
+                  </span>
+                )}
+                {ecs.technique(e) && (
+                  <span className="text-[9px] font-mono text-purple-400">{ecs.technique(e)}</span>
+                )}
+              </div>
+              <span className="text-[10px] text-slate-500 tabular-nums">{fmtTime(e['@timestamp'])}</span>
+            </div>
+            <div className="text-xs font-semibold text-slate-300 truncate">
+              {e.rule?.name ?? ecs.type(e)}
+            </div>
+            <div className="text-[11px] text-slate-500 truncate">{e.message}</div>
+            <div className="text-[10px] text-slate-600 mt-0.5">
+              {ecs.source(e)}{ecs.dest(e) ? ` → ${ecs.dest(e)}` : ''}
+            </div>
+          </li>
+        )
+      })}
     </ul>
   )
 }

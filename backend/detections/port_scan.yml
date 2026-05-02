@@ -1,0 +1,29 @@
+title: Network Port Scan
+id: rule-0002-port-scan
+description: >
+  Active scanning behaviour — single source probing many ports/hosts in a short window.
+author: Pham Nhat Hoang
+status: experimental
+references:
+  - https://attack.mitre.org/techniques/T1046/
+
+logsource:
+  category: network
+
+detection:
+  selection:
+    event.category: network
+    event.action: scan
+  threshold:
+    by: source.ip
+    count: 3
+    window_seconds: 30
+  condition: selection AND threshold
+
+mitre:
+  tactic: Discovery
+  technique_id: T1046
+  technique_name: Network Service Discovery
+
+severity: medium
+risk_weight: 15

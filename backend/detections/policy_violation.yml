@@ -1,0 +1,23 @@
+title: Security Policy Violation
+id: rule-0005-policy-violation
+description: >
+  Defensive control disabled or bypassed (Windows Firewall off, AV disabled,
+  AppLocker bypass, UAC disabled). Strong indicator of attacker preparing the host.
+author: Pham Nhat Hoang
+
+logsource:
+  category: configuration
+
+detection:
+  selection:
+    event.category: configuration
+    event.action: policy_violation
+  condition: selection
+
+mitre:
+  tactic: Defense Evasion
+  technique_id: T1562.001
+  technique_name: Disable Security Tools
+
+severity: high
+risk_weight: 20

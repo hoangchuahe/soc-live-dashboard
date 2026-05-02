@@ -10,7 +10,10 @@ import { GeoMap } from './components/GeoMap'
 import { MitrePanel, useMitreTactics } from './components/MitrePanel'
 import { CveFeed, useCves } from './components/CveFeed'
 import { LogViewer } from './components/LogViewer'
-import type { MetricPoint, NetworkNode, NetworkEdge, SecurityEvent, Metrics, AttackArc } from './types'
+import { RiskPanel, useRiskTop } from './components/RiskPanel'
+import { RulesPanel, useRules } from './components/RulesPanel'
+import { ecs } from './types'
+import type { MetricPoint, NetworkNode, NetworkEdge, EcsEvent, Metrics, AttackArc } from './types'
 
 const WS_URL = import.meta.env.DEV
   ? 'ws://localhost:8000/ws'
@@ -18,20 +21,25 @@ const WS_URL = import.meta.env.DEV
 
 const MAX_HISTORY = 60
 const MAX_ARCS = 30
+const MAX_EVENTS = 200
 
 export default function App() {
   const { frame, status } = useWebSocket(WS_URL)
 
   const [history, setHistory]   = useState<MetricPoint[]>([])
   const [metrics, setMetrics]   = useState<Metrics | null>(null)
-  const [events, setEvents]     = useState<SecurityEvent[]>([])
+  const [events, setEvents]     = useState<EcsEvent[]>([])
+  const [alerts, setAlerts]     = useState<EcsEvent[]>([])
   const [nodes, setNodes]       = useState<NetworkNode[]>([])
   const [edges, setEdges]       = useState<NetworkEdge[]>([])
   const [arcs, setArcs]         = useState<AttackArc[]>([])
   const [activeTab, setActiveTab] = useState<'timeline' | 'logs'>('timeline')
+  const [activeBottomTab, setActiveBottomTab] = useState<'risk' | 'rules'>('risk')
 
-  const tactics      = useMitreTactics()
-  const { cves, loading: cvesLoading } = useCves()
+  const tactics                          = useMitreTactics()
+  const { cves, loading: cvesLoading }   = useCves()
+  const riskEntities                     = useRiskTop()
+  const rules                            = useRules()
 
   // One-time data loads
   useEffect(() => {
@@ -45,21 +53,26 @@ export default function App() {
     fetch('/api/events')
       .then(r => r.json())
       .then(d => {
-        const evts: SecurityEvent[] = d.events ?? []
+        const evts: EcsEvent[] = d.events ?? []
         setEvents(evts)
-        const initial = evts
-          .filter(e => e.source_lat && e.source_lng)
+        const initial: AttackArc[] = evts
+          .filter(e => ecs.lat(e) || ecs.lon(e))
           .slice(-MAX_ARCS)
           .map(e => ({
-            id: e.id,
-            country: e.source_country,
-            lat: e.source_lat,
-            lng: e.source_lng,
-            severity: e.severity,
-            count: e.count,
+            id: e.event.id,
+            country: ecs.country(e),
+            lat: ecs.lat(e),
+            lng: ecs.lon(e),
+            severity: ecs.severity(e),
+            count: ecs.count(e),
           }))
         setArcs(initial)
       })
+      .catch(() => {})
+
+    fetch('/api/alerts')
+      .then(r => r.json())
+      .then(d => setAlerts(d.alerts ?? []))
       .catch(() => {})
   }, [])
 
@@ -85,23 +98,37 @@ export default function App() {
       const e = frame.event
       setEvents(prev => {
         const next = [...prev, e]
-        return next.length > 200 ? next.slice(-200) : next
+        return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next
       })
-      if (e.source_lat && e.source_lng) {
+      const lat = ecs.lat(e)
+      const lon = ecs.lon(e)
+      if (lat || lon) {
         setArcs(prev => {
           const next: AttackArc[] = [
             ...prev,
-            { id: e.id, country: e.source_country, lat: e.source_lat, lng: e.source_lng, severity: e.severity, count: e.count },
+            { id: e.event.id, country: ecs.country(e), lat, lng: lon, severity: ecs.severity(e), count: ecs.count(e) },
           ]
           return next.length > MAX_ARCS ? next.slice(-MAX_ARCS) : next
         })
       }
     }
+
+    if (frame.alerts && frame.alerts.length > 0) {
+      setAlerts(prev => {
+        const next = [...prev, ...frame.alerts]
+        return next.length > 100 ? next.slice(-100) : next
+      })
+    }
   }, [frame])
 
   const cpu = metrics?.cpu_percent ?? 0
   const mem = metrics?.memory_percent ?? 0
-  const criticals = events.filter(e => e.severity === 'critical').length
+  const criticalEvents = events.filter(e => ecs.severity(e) === 'critical').length
+
+  // Combined event stream for timeline (events + alerts, sorted by time)
+  const combined: EcsEvent[] = [...events, ...alerts]
+    .sort((a, b) => a['@timestamp'].localeCompare(b['@timestamp']))
+    .slice(-50)
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">
@@ -111,13 +138,13 @@ export default function App() {
 
         {/* ── Row 1: Stats ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-          <StatsCard label="CPU"          value={cpu.toFixed(1)}                           unit="%" color="cyan"   danger={cpu > 85} />
-          <StatsCard label="Memory"       value={mem.toFixed(1)}                           unit="%" color="purple" danger={mem > 85} />
-          <StatsCard label="Disk"         value={metrics?.disk_percent.toFixed(1) ?? '—'}  unit="%" color="orange" />
+          <StatsCard label="CPU"          value={cpu.toFixed(1)}                             unit="%"    color="cyan"   danger={cpu > 85} />
+          <StatsCard label="Memory"       value={mem.toFixed(1)}                             unit="%"    color="purple" danger={mem > 85} />
+          <StatsCard label="Disk"         value={metrics?.disk_percent.toFixed(1) ?? '—'}    unit="%"    color="orange" />
           <StatsCard label="Net In"       value={metrics?.network_in_mbps.toFixed(0) ?? '—'} unit="Mbps" color="green" />
           <StatsCard label="Net Out"      value={metrics?.network_out_mbps.toFixed(0) ?? '—'} unit="Mbps" color="green" />
-          <StatsCard label="Connections"  value={metrics?.active_connections ?? '—'}       color="cyan" />
-          <StatsCard label="Alerts / hr"  value={metrics?.alerts_last_hour ?? '—'}         color="red" danger={criticals > 0} />
+          <StatsCard label="Detections"   value={alerts.length}                              color="red"  danger={alerts.length > 0} />
+          <StatsCard label="Alerts / hr"  value={metrics?.alerts_last_hour ?? '—'}           color="red"  danger={criticalEvents > 0} />
         </div>
 
         {/* ── Row 2: Geo map + Network topology ── */}
@@ -142,8 +169,8 @@ export default function App() {
           </Panel>
         </div>
 
-        {/* ── Row 4: Timeline/Logs + MITRE + Alerts ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3" style={{ minHeight: 220 }}>
+        {/* ── Row 4: Timeline/Logs + MITRE + Risk/Rules ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3" style={{ minHeight: 260 }}>
 
           {/* Timeline / Log viewer — tabbed */}
           <div className="lg:col-span-5 relative scanline bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
@@ -166,11 +193,13 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <span className="text-[10px] text-slate-600">{events.length} events</span>
+              <span className="text-[10px] text-slate-600">
+                {events.length} events · {alerts.length} alerts
+              </span>
             </div>
             <div className="flex-1 overflow-hidden">
               {activeTab === 'timeline'
-                ? <div className="p-2 h-full"><EventTimeline events={events.slice(-40)} /></div>
+                ? <div className="p-2 h-full"><EventTimeline events={combined} /></div>
                 : <LogViewer events={events.slice(-50)} />
               }
             </div>
@@ -181,11 +210,43 @@ export default function App() {
             <MitrePanel tactics={tactics} />
           </Panel>
 
-          {/* Alert feed */}
-          <Panel title={`Alert Feed  (${criticals} critical)`} className="lg:col-span-4">
-            <AlertFeed events={events.slice(-40)} />
-          </Panel>
+          {/* Risk-Based Alerting / Detection Rules — tabbed */}
+          <div className="lg:col-span-4 relative scanline bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
+            <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                <div className="flex gap-1">
+                  {(['risk', 'rules'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveBottomTab(tab)}
+                      className={`text-xs px-3 py-1 rounded transition-colors ${
+                        activeBottomTab === tab
+                          ? 'bg-cyan-500/20 text-cyan-400'
+                          : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {tab === 'risk' ? 'Top Risk Entities' : `Rules (${rules.length})`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {activeBottomTab === 'risk'
+                ? <RiskPanel entities={riskEntities} />
+                : <RulesPanel rules={rules} />
+              }
+            </div>
+          </div>
 
+        </div>
+
+        {/* ── Row 5: Alert Feed (full width) ── */}
+        <div className="grid grid-cols-1 gap-3" style={{ minHeight: 200 }}>
+          <Panel title={`Live Alert Feed  ·  ${criticalEvents} critical / ${alerts.length} rule-driven`}>
+            <AlertFeed events={[...events, ...alerts].slice(-60)} />
+          </Panel>
         </div>
 
       </main>

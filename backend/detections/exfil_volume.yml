@@ -1,0 +1,23 @@
+title: Data Exfiltration — Anomalous Outbound Volume
+id: rule-0006-exfil-volume
+description: >
+  Host transmitted unusually large outbound data volume relative to its baseline,
+  typical of staged data exfiltration over an existing C2 channel.
+author: Pham Nhat Hoang
+
+logsource:
+  category: network
+
+detection:
+  selection:
+    event.category: network
+    event.action: anomaly
+  condition: selection
+
+mitre:
+  tactic: Exfiltration
+  technique_id: T1041
+  technique_name: Exfiltration Over C2 Channel
+
+severity: medium
+risk_weight: 15

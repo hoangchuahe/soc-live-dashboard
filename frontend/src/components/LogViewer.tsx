@@ -1,7 +1,8 @@
-import type { SecurityEvent } from '../types'
+import type { EcsEvent } from '../types'
+import { ecs } from '../types'
 
 interface Props {
-  events: SecurityEvent[]
+  events: EcsEvent[]
 }
 
 const FORMAT_BADGE: Record<string, string> = {
@@ -12,7 +13,7 @@ const FORMAT_BADGE: Record<string, string> = {
 }
 
 export function LogViewer({ events }: Props) {
-  const withLogs = events.filter(e => e.raw_log)
+  const withLogs = events.filter(e => ecs.rawLog(e))
 
   if (withLogs.length === 0) {
     return (
@@ -24,18 +25,21 @@ export function LogViewer({ events }: Props) {
 
   return (
     <div className="overflow-y-auto h-full font-mono text-[10px] p-2 space-y-0.5">
-      {[...withLogs].reverse().map(e => (
-        <div
-          key={e.id}
-          className="flex items-start gap-2 px-2 py-1 rounded hover:bg-slate-800/50 transition-colors"
-        >
-          <span className={`shrink-0 px-1.5 py-0.5 rounded text-[8px] font-semibold ${FORMAT_BADGE[e.log_format] ?? 'bg-slate-700 text-slate-400'}`}>
-            {e.log_format.toUpperCase()}
-          </span>
-          <span className="text-slate-500 shrink-0">{e.timestamp.slice(11, 19)}</span>
-          <span className="text-slate-300 break-all leading-relaxed">{e.raw_log}</span>
-        </div>
-      ))}
+      {[...withLogs].reverse().map(e => {
+        const fmt = ecs.format(e)
+        return (
+          <div
+            key={e.event.id}
+            className="flex items-start gap-2 px-2 py-1 rounded hover:bg-slate-800/50 transition-colors"
+          >
+            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[8px] font-semibold ${FORMAT_BADGE[fmt] ?? 'bg-slate-700 text-slate-400'}`}>
+              {fmt.toUpperCase()}
+            </span>
+            <span className="text-slate-500 shrink-0">{e['@timestamp'].slice(11, 19)}</span>
+            <span className="text-slate-300 break-all leading-relaxed">{ecs.rawLog(e)}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -1,33 +1,47 @@
+// ─── Elastic Common Schema (ECS) shape ──────────────────────────────────────
+// The backend emits events conforming to ECS:
+//   https://www.elastic.co/guide/en/ecs/current/
+
+export interface EcsEvent {
+  '@timestamp': string
+  event: {
+    id: string
+    kind: 'event' | 'alert'
+    category: string           // authentication | network | malware | configuration | intrusion_detection | detection
+    action?: string
+    outcome?: 'success' | 'failure' | 'unknown'
+    severity: 'low' | 'medium' | 'high' | 'critical'
+    module?: string            // winevent | syslog | netflow | cef
+  }
+  source?: {
+    ip?: string
+    geo?: {
+      country_name?: string
+      location?: { lat: number; lon: number }
+    }
+  }
+  destination?: { ip?: string }
+  host?: { name?: string }
+  user?: { name?: string }
+  process?: { name?: string }
+  threat?: {
+    tactic?:    { name?: string } | null
+    technique?: { id?: string; name?: string } | null
+  }
+  rule?: { id: string; name: string }       // populated only on alerts
+  log?: { original?: string; level?: string }
+  message: string
+  matched_count?: number
+  entity?: string
+  triggering_event_id?: string
+}
+
 export interface MetricPoint {
   tick: number
   cpu: number
   memory: number
   networkIn: number
   networkOut: number
-}
-
-export interface SecurityEvent {
-  id: string
-  timestamp: string
-  type: string
-  severity: 'low' | 'medium' | 'high' | 'critical'
-  source_ip: string
-  source_country: string
-  source_lat: number
-  source_lng: number
-  destination_ip: string | null
-  message: string
-  count: number
-  // MITRE ATT&CK
-  technique_id: string | null
-  technique_name: string | null
-  tactic: string | null
-  // Host context
-  hostname: string | null
-  process: string | null
-  event_id: number | null
-  log_format: 'winevent' | 'syslog' | 'netflow' | 'cef'
-  raw_log: string | null
 }
 
 export interface NetworkNode {
@@ -55,7 +69,8 @@ export interface Metrics {
 export interface WsFrame {
   tick: number
   metrics: Metrics
-  event: SecurityEvent | null
+  event: EcsEvent | null
+  alerts: EcsEvent[]
 }
 
 export interface CveItem {
@@ -79,4 +94,41 @@ export interface AttackArc {
   lng: number
   severity: string
   count: number
+}
+
+export interface RiskEntity {
+  name: string
+  score: number
+  rule_count: number
+  last_updated_seconds_ago: number
+}
+
+export interface RuleSummary {
+  id: string
+  title: string
+  severity: string
+  tactic: string | null
+  technique_id: string | null
+  fire_count: number
+  last_fired: string | null
+  has_threshold: boolean
+}
+
+// ─── Helpers to extract flat fields from ECS events ──────────────────────────
+
+export const ecs = {
+  severity: (e: EcsEvent) => e.event.severity,
+  type:     (e: EcsEvent) => e.event.action ?? e.event.category,
+  source:   (e: EcsEvent) => e.source?.ip ?? '—',
+  country:  (e: EcsEvent) => e.source?.geo?.country_name ?? 'Unknown',
+  lat:      (e: EcsEvent) => e.source?.geo?.location?.lat ?? 0,
+  lon:      (e: EcsEvent) => e.source?.geo?.location?.lon ?? 0,
+  dest:     (e: EcsEvent) => e.destination?.ip ?? null,
+  host:     (e: EcsEvent) => e.host?.name ?? null,
+  tactic:   (e: EcsEvent) => e.threat?.tactic?.name ?? null,
+  technique:(e: EcsEvent) => e.threat?.technique?.id ?? null,
+  rawLog:   (e: EcsEvent) => e.log?.original ?? null,
+  format:   (e: EcsEvent) => e.event.module ?? 'unknown',
+  count:    (e: EcsEvent) => e.matched_count ?? 1,
+  isAlert:  (e: EcsEvent) => e.event.kind === 'alert',
 }
