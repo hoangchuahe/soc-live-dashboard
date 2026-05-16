@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.query.lexer import Token, tokenize, LexError
+from app.query.lexer import LexError, Token, tokenize
 
 
 def kinds(src: str) -> list[str]:
@@ -51,6 +51,10 @@ class TestSingleTokens:
     def test_parens(self):
         assert kinds("()") == ["LPAREN", "RPAREN"]
 
+    def test_tokenize_returns_token_instances(self):
+        toks = tokenize("foo")
+        assert isinstance(toks[0], Token)
+
     @pytest.mark.parametrize("src,kind", [
         ("and", "AND"), ("AND", "AND"), ("And", "AND"),
         ("or", "OR"), ("OR", "OR"),
@@ -88,6 +92,11 @@ class TestPositions:
         assert toks[1].position == 2
         assert toks[2].position == 6
 
+    def test_eof_position_is_end_of_input(self):
+        toks = tokenize("foo")
+        assert toks[-1].kind == "EOF"
+        assert toks[-1].position == 3
+
 
 class TestLexErrors:
     def test_unterminated_string(self):
@@ -99,3 +108,8 @@ class TestLexErrors:
         with pytest.raises(LexError) as exc:
             tokenize("foo @ bar")
         assert exc.value.position == 4
+
+    def test_double_dot_number_raises(self):
+        with pytest.raises(LexError) as exc:
+            tokenize("1.2.3")
+        assert exc.value.position == 0
