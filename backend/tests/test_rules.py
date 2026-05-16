@@ -15,7 +15,7 @@ Adding a new rule:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -27,7 +27,7 @@ def _ecs_event(category: str, action: str, *, outcome: str = "success",
                source_ip: str = "203.0.113.42", host: str = "WKS-01") -> dict:
     """Helper: build a minimal ECS-shaped event."""
     return {
-        "@timestamp": datetime.now(timezone.utc).isoformat(),
+        "@timestamp": datetime.now(UTC).isoformat(),
         "event": {
             "id": f"evt-{int(time.time() * 1_000_000)}",
             "kind": "event",

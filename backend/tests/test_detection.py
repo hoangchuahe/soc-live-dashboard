@@ -11,21 +11,20 @@ Validates that:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from app.detection import DetectionEngine, load_rules
-from app.detection.loader import Rule, Threshold
+from app.detection.loader import Rule
 from app.risk import RiskTracker
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 def make_event(category: str, action: str, outcome: str = "failure",
                source_ip: str = "1.2.3.4", host: str = "WKS-01") -> dict:
     return {
-        "@timestamp": datetime.now(timezone.utc).isoformat(),
+        "@timestamp": datetime.now(UTC).isoformat(),
         "event": {
             "id": f"evt-{int(time.time() * 1000)}",
             "kind": "event",

@@ -6,7 +6,7 @@ Splunk (via SS-ECS), or translated to OCSF without remapping.
 """
 
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .ecs import make_event
 from .geo_data import random_source
@@ -198,7 +198,7 @@ def maybe_event() -> dict | None:
         process=process or "-",
     )
 
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(UTC).isoformat()
     event_id = f"evt-{random.randint(100_000, 999_999)}"
     # If this came from the attacker behaviour branch, use the attacker IP pool
     # so threshold rules (5 failed auth in 60s, 3 scans in 30s) actually fire.
