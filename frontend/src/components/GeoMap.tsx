@@ -72,19 +72,13 @@ export function GeoMap({ arcs }: Props) {
       .attr('stroke-width', 0.4)
 
     // Countries — colour by attack count
-    const countByCountry: Record<string, number> = {}
-    for (const a of arcs) {
-      countByCountry[a.country] = (countByCountry[a.country] ?? 0) + a.count
-    }
-    const maxCount = Math.max(...Object.values(countByCountry), 1)
-    const colorScale = d3.scaleSequential(d3.interpolate('#0f2133', '#7f1d1d')).domain([0, maxCount])
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const countries = topojson.feature(world, (world as any).objects.countries) as d3.ExtendedFeatureCollection
+    const countries = topojson.feature(world, (world as any).objects.countries) as unknown as d3.ExtendedFeatureCollection
     g.append('g').selectAll('path')
       .data(countries.features)
       .join('path')
-      .attr('d', path as d3.ValueFn<SVGPathElement, d3.ExtendedFeature, string | null>)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .attr('d', path as any)
       .attr('fill', '#0f2133')
       .attr('stroke', '#1e3a5f')
       .attr('stroke-width', 0.5)
