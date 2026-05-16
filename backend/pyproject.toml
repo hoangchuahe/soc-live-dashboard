@@ -28,3 +28,4 @@ exclude = ["tests/"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
+asyncio_mode = "auto"
