@@ -76,6 +76,16 @@ Each event is fired to ElasticSearch via `asyncio.create_task` so the WebSocket
 tick is never blocked by indexing latency. If ES is down the dashboard runs
 fine; the optional `--profile elastic` brings up ES + Kibana for the demo.
 
+### Investigation search (DSL)
+
+`GET /api/search` parses a small query DSL — lexer → recursive-descent parser →
+AST evaluator, all in [`backend/app/query/`](../backend/app/query) — and runs the
+resulting predicate against events in SQLite, scoped to a time window. The AST
+is the storage-agnostic indirection layer: if events later move to a different
+store, only the evaluator changes. The previous ES passthrough is preserved at
+`GET /api/search/es`. Frontend exposes the same DSL through a pivot button on
+each alert that opens a side drawer pre-filled with `source.ip:"…"`.
+
 ## What's deliberately *not* in this build
 
 | Pattern                 | Why omitted (and how to add it)                                                                           |
@@ -95,5 +105,7 @@ fine; the optional `--profile elastic` brings up ES + Kibana for the demo.
 - `backend/app/risk.py`                  — RBA score tracker
 - `backend/app/ecs.py`                   — ECS event factory
 - `backend/app/metrics.py`               — Prometheus exposition
+- `backend/app/query/`                   — DSL lexer, parser, evaluator
 - `backend/tests/test_detection.py`      — engine + risk tests (11 cases)
+- `backend/tests/test_query_*.py`        — DSL lexer / parser / evaluator tests
 - `docs/SCHEMA.md`                       — ECS ↔ OCSF ↔ CIM mapping
