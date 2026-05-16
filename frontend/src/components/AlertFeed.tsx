@@ -3,6 +3,7 @@ import { ecs } from '../types'
 
 interface Props {
   events: EcsEvent[]
+  onPivot?: (query: string) => void
 }
 
 const SEV_BADGE: Record<string, string> = {
@@ -16,7 +17,7 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-GB', { hour12: false })
 }
 
-export function AlertFeed({ events }: Props) {
+export function AlertFeed({ events, onPivot }: Props) {
   if (events.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-600 text-sm">
@@ -29,6 +30,7 @@ export function AlertFeed({ events }: Props) {
     <ul className="overflow-y-auto h-full divide-y divide-slate-800/60">
       {[...events].reverse().map(e => {
         const sev = ecs.severity(e)
+        const ip = e.source?.ip
         return (
           <li key={e.event.id} className="px-4 py-2.5 hover:bg-slate-800/40 transition-colors">
             <div className="flex items-center justify-between gap-2 mb-1">
@@ -45,7 +47,17 @@ export function AlertFeed({ events }: Props) {
                   <span className="text-[9px] font-mono text-purple-400">{ecs.technique(e)}</span>
                 )}
               </div>
-              <span className="text-[10px] text-slate-500 tabular-nums">{fmtTime(e['@timestamp'])}</span>
+              <div className="flex items-center gap-2">
+                {onPivot && ip && (
+                  <button
+                    onClick={() => onPivot(`source.ip:"${ip}"`)}
+                    title={`Pivot to events from ${ip}`}
+                    aria-label={`Pivot to events from ${ip}`}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300"
+                  >🔍</button>
+                )}
+                <span className="text-[10px] text-slate-500 tabular-nums">{fmtTime(e['@timestamp'])}</span>
+              </div>
             </div>
             <div className="text-xs font-semibold text-slate-300 truncate">
               {e.rule?.name ?? ecs.type(e)}

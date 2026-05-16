@@ -6,6 +6,8 @@ import { MetricsChart } from './components/MetricsChart'
 import { NetworkGraph } from './components/NetworkGraph'
 import { EventTimeline } from './components/EventTimeline'
 import { AlertFeed } from './components/AlertFeed'
+import { SearchPanel } from './components/SearchPanel'
+import type { Preset } from './lib/timeRange'
 import { GeoMap } from './components/GeoMap'
 import { MitrePanel, useMitreTactics } from './components/MitrePanel'
 import { CveFeed, useCves } from './components/CveFeed'
@@ -35,11 +37,22 @@ export default function App() {
   const [arcs, setArcs]         = useState<AttackArc[]>([])
   const [activeTab, setActiveTab] = useState<'timeline' | 'logs'>('timeline')
   const [activeBottomTab, setActiveBottomTab] = useState<'risk' | 'rules'>('risk')
+  const [pivot, setPivot] = useState<{ open: boolean; query: string; preset: Preset }>({
+    open: false, query: '', preset: '15m',
+  })
 
   const tactics                          = useMitreTactics()
   const { cves, loading: cvesLoading }   = useCves()
   const riskEntities                     = useRiskTop()
   const rules                            = useRules()
+
+  // Deep-link: open SearchPanel if ?q= is present in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q')
+    const p = (params.get('preset') ?? '15m') as Preset
+    if (q) setPivot({ open: true, query: q, preset: p })
+  }, [])
 
   // One-time data loads
   useEffect(() => {
@@ -245,11 +258,21 @@ export default function App() {
         {/* ── Row 5: Alert Feed (full width) ── */}
         <div className="grid grid-cols-1 gap-3" style={{ minHeight: 200 }}>
           <Panel title={`Live Alert Feed  ·  ${criticalEvents} critical / ${alerts.length} rule-driven`}>
-            <AlertFeed events={[...events, ...alerts].slice(-60)} />
+            <AlertFeed
+              events={[...events, ...alerts].slice(-60)}
+              onPivot={(query) => setPivot({ open: true, query, preset: '15m' })}
+            />
           </Panel>
         </div>
 
       </main>
+
+      <SearchPanel
+        open={pivot.open}
+        initialQuery={pivot.query}
+        initialPreset={pivot.preset}
+        onClose={() => setPivot(s => ({ ...s, open: false }))}
+      />
     </div>
   )
 }
