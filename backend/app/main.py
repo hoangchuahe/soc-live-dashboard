@@ -27,6 +27,7 @@ import asyncio
 import json
 from collections import deque
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,15 +35,20 @@ from fastapi.responses import PlainTextResponse
 
 from . import db, elastic, metrics
 from .auth import (
-    LoginRequest, LoginResponse, UserInfo,
-    authenticate, create_access_token, current_user, require_admin,
+    LoginRequest,
+    LoginResponse,
+    UserInfo,
+    authenticate,
+    create_access_token,
+    current_user,
+    require_admin,
 )
 from .detection import DetectionEngine, load_rules
 from .mitre_data import TACTICS_ORDER, TECHNIQUES
+from .query import ParseError, evaluate, parse
 from .risk import RiskTracker
 from .simulator import get_topology, maybe_event, next_metrics
 from .threat_intel import fetch_recent_cves
-
 
 # ── Globals ───────────────────────────────────────────────────────────────────
 
@@ -242,10 +248,52 @@ async def mitre_tactics():
     }
 
 
-# ── ElasticSearch passthrough search ──────────────────────────────────────────
+# ── Search (DSL over SQLite ring) + ES passthrough ────────────────────────────
+
+def _parse_window(from_q: str | None, to_q: str | None) -> tuple[datetime, datetime]:
+    to_ts = datetime.fromisoformat(to_q.replace("Z", "+00:00")) if to_q else datetime.now(UTC)
+    from_ts = (
+        datetime.fromisoformat(from_q.replace("Z", "+00:00")) if from_q
+        else to_ts - timedelta(minutes=15)
+    )
+    return from_ts, to_ts
+
 
 @app.get("/api/search", tags=["Telemetry"])
-async def search(q: str = Query(..., min_length=1)):
+async def search(
+    q: str = Query(..., min_length=1),
+    from_: str | None = Query(None, alias="from"),
+    to:    str | None = Query(None),
+    limit: int = Query(100, le=500),
+):
+    """DSL search over persisted events. Time window defaults to last 15 minutes."""
+    try:
+        ast = parse(q)
+    except ParseError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"detail": exc.detail, "position": exc.position},
+        ) from exc
+
+    from_ts, to_ts = _parse_window(from_, to)
+    results = await db.search_events(
+        predicate=lambda e: evaluate(ast, e),
+        from_ts=from_ts,
+        to_ts=to_ts,
+        limit=limit,
+    )
+    return {
+        "results": results,
+        "matched": len(results),
+        "from": from_ts.isoformat(),
+        "to": to_ts.isoformat(),
+        "source": "sqlite",
+    }
+
+
+@app.get("/api/search/es", tags=["Telemetry"])
+async def search_es(q: str = Query(..., min_length=1)):
+    """Raw ElasticSearch passthrough — only useful when --profile elastic is up."""
     results = await elastic.search(q)
     return {
         "results": results,
