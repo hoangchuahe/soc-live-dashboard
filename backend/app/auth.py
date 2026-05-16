@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -69,12 +69,12 @@ class UserInfo(BaseModel):
 # ── JWT helpers ───────────────────────────────────────────────────────────────
 
 def create_access_token(username: str, role: str) -> tuple[str, int]:
-    expire = datetime.now(timezone.utc) + timedelta(hours=TOKEN_TTL_HOURS)
+    expire = datetime.now(UTC) + timedelta(hours=TOKEN_TTL_HOURS)
     payload = {
         "sub": username,
         "role": role,
         "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "iat": datetime.now(UTC),
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
     return token, TOKEN_TTL_HOURS * 3600

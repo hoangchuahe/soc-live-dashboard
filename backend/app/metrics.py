@@ -32,7 +32,7 @@ class Counter:
             return out
         for key, val in sorted(self._values.items()):
             if self.label_names:
-                label_str = ",".join(f'{n}="{v}"' for n, v in zip(self.label_names, key))
+                label_str = ",".join(f'{n}="{v}"' for n, v in zip(self.label_names, key, strict=True))
                 out.append(f"{self.name}{{{label_str}}} {val}")
             else:
                 out.append(f"{self.name} {val}")

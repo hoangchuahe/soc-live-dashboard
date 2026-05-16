@@ -211,6 +211,33 @@ Authenticated (Bearer token from `/api/auth/login`):
 
 OpenAPI spec auto-generated at `/docs` (Swagger UI) and `/redoc`.
 
+### Querying events — the DSL
+
+Click the 🔍 button on any alert in the feed to open the investigation drawer
+pre-filled with `source.ip:"…"`. The same query language drives `/api/search`:
+
+```
+GET /api/search?q=<dsl>&from=<iso>&to=<iso>&limit=N
+```
+
+Time defaults to the last 15 minutes.
+
+| Example | Meaning |
+|---|---|
+| `source.ip:"10.0.0.5"` | substring match on the source IP |
+| `event.severity:high AND event.category:authentication` | two clauses |
+| `source.ip:"10.0.0.5" AND NOT event.outcome:success` | exclude successes |
+| `risk_score >= 50` | numeric comparison |
+
+Grammar lives in [`backend/app/query/parser.py`](backend/app/query/parser.py).
+Operator semantics: `:` is case-insensitive substring (or numeric equality),
+`=`/`!=` are strict, and `>` `>=` `<` `<=` are numeric where both sides parse
+as numbers.
+
+> **Breaking change:** the previous ElasticSearch passthrough that lived at
+> `GET /api/search` moved to `GET /api/search/es`. The new `/api/search` is
+> DSL-driven and queries the SQLite ring buffer.
+
 ### Demo credentials
 
 ```bash

@@ -4,9 +4,10 @@ No API key required. Results cached for 1 hour to respect rate limits.
 https://nvd.nist.gov/developers/vulnerabilities
 """
 
-import httpx
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
+
+import httpx
 
 _cache: list[dict] = []
 _fetched_at: datetime | None = None
@@ -16,7 +17,7 @@ _TTL = timedelta(hours=1)
 async def fetch_recent_cves(limit: int = 15) -> list[dict]:
     global _cache, _fetched_at
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if _fetched_at and (now - _fetched_at) < _TTL and _cache:
         return _cache[:limit]
 

@@ -16,11 +16,11 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from .loader import Rule, _resolve
 from ..risk import RiskTracker
+from .loader import Rule, _resolve
 
 
 @dataclass
@@ -129,7 +129,7 @@ class DetectionEngine:
             rule_id=rule.id,
             rule_title=rule.title,
             severity=rule.severity,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             entity=entity,
             technique_id=rule.technique_id,
             technique_name=rule.technique_name,

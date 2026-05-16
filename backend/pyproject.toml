@@ -10,6 +10,8 @@ ignore = [
     "S311",   # random for non-crypto use is fine
     "B008",   # FastAPI Depends() default
     "S101",   # asserts in tests are correct
+    "S105",   # OAuth "bearer" token_type literal is not a password
+    "S110",   # try/except/pass is intentional for best-effort persistence (see db.py, elastic.py)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -28,3 +30,4 @@ exclude = ["tests/"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
+asyncio_mode = "auto"

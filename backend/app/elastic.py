@@ -6,9 +6,8 @@ Enable with:  docker compose --profile elastic up
 Query index:  GET http://localhost:9200/soc-events/_search
 """
 
-import os
 import asyncio
-from datetime import datetime, timezone
+import os
 
 ES_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
 INDEX = "soc-events"

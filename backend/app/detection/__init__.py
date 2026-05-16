@@ -1,4 +1,4 @@
-from .engine import DetectionEngine, Detection
-from .loader import load_rules, Rule
+from .engine import Detection, DetectionEngine
+from .loader import Rule, load_rules
 
 __all__ = ["DetectionEngine", "Detection", "load_rules", "Rule"]

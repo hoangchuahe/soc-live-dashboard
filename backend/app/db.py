@@ -14,13 +14,21 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import (
-    Column, DateTime, Float, Integer, String, Text, select, delete, func,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    delete,
+    func,
+    select,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -91,7 +99,7 @@ async def persist_event(event: dict) -> None:
             stored = StoredEvent(
                 event_id  = ev.get("id", ""),
                 timestamp = datetime.fromisoformat(event["@timestamp"].replace("Z", "+00:00"))
-                            if event.get("@timestamp") else datetime.now(timezone.utc),
+                            if event.get("@timestamp") else datetime.now(UTC),
                 kind      = ev.get("kind", "event"),
                 category  = ev.get("category", "unknown"),
                 severity  = ev.get("severity", "low"),
@@ -132,7 +140,7 @@ async def persist_risk_score(entity: str, score: float, rule_count: int) -> None
     try:
         async with get_session() as s:
             existing = await s.get(StoredRiskScore, entity)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if existing:
                 existing.score = score
                 existing.last_updated = now
@@ -154,7 +162,7 @@ async def create_alert_lifecycle(alert_id: str) -> None:
             existing = await s.get(AlertLifecycle, alert_id)
             if existing:
                 return
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             s.add(AlertLifecycle(alert_id=alert_id, status="new", created=now, updated=now))
             await s.commit()
     except Exception:
@@ -171,7 +179,7 @@ async def update_alert_status(alert_id: str, status: str, assignee: str | None =
         if not record:
             return False
         record.status = status
-        record.updated = datetime.now(timezone.utc)
+        record.updated = datetime.now(UTC)
         if assignee:
             record.assignee = assignee
         if note:
@@ -197,10 +205,45 @@ async def list_alert_lifecycle(status: str | None = None, limit: int = 50) -> li
         ]
 
 
+# ── Search ────────────────────────────────────────────────────────────────────
+
+
+async def search_events(
+    predicate: Callable[[dict], bool],
+    from_ts: datetime,
+    to_ts: datetime,
+    limit: int = 100,
+) -> list[dict]:
+    """Stream events in [from_ts, to_ts), apply predicate in Python, return up to `limit`.
+
+    Rows are scanned newest-first so the most recent matches are returned when
+    the window is wider than `limit` matches.
+    """
+    matches: list[dict] = []
+    async with get_session() as s:
+        stmt = (
+            select(StoredEvent.raw_json)
+            .where(StoredEvent.timestamp >= from_ts)
+            .where(StoredEvent.timestamp < to_ts)
+            .order_by(StoredEvent.timestamp.desc())
+        )
+        result = await s.execute(stmt)
+        for (raw,) in result.all():
+            try:
+                event = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if predicate(event):
+                matches.append(event)
+                if len(matches) >= limit:
+                    break
+    return list(reversed(matches))   # caller wants oldest-first
+
+
 async def prune_old_events(days: int = 7) -> int:
     """Delete events older than `days`. Returns count deleted."""
-    cutoff = datetime.now(timezone.utc).timestamp() - (days * 86400)
-    cutoff_dt = datetime.fromtimestamp(cutoff, tz=timezone.utc)
+    cutoff = datetime.now(UTC).timestamp() - (days * 86400)
+    cutoff_dt = datetime.fromtimestamp(cutoff, tz=UTC)
     async with get_session() as s:
         stmt = delete(StoredEvent).where(StoredEvent.timestamp < cutoff_dt)
         result = await s.execute(stmt)
