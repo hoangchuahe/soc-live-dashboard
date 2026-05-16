@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-
 TokenKind = Literal[
     "IDENT", "DOT", "COLON", "OP", "STRING", "NUMBER",
     "LPAREN", "RPAREN", "AND", "OR", "NOT", "EOF",
@@ -48,20 +47,32 @@ def tokenize(src: str) -> list[Token]:
             continue
 
         if ch == "(":
-            tokens.append(Token("LPAREN", "(", i)); i += 1; continue
+            tokens.append(Token("LPAREN", "(", i))
+            i += 1
+            continue
         if ch == ")":
-            tokens.append(Token("RPAREN", ")", i)); i += 1; continue
+            tokens.append(Token("RPAREN", ")", i))
+            i += 1
+            continue
         if ch == ":":
-            tokens.append(Token("COLON", ":", i)); i += 1; continue
+            tokens.append(Token("COLON", ":", i))
+            i += 1
+            continue
         if ch == ".":
-            tokens.append(Token("DOT", ".", i)); i += 1; continue
+            tokens.append(Token("DOT", ".", i))
+            i += 1
+            continue
 
         # Operators — try two-char first
         two = src[i : i + 2]
         if two in _TWO_CHAR_OPS:
-            tokens.append(Token("OP", two, i)); i += 2; continue
+            tokens.append(Token("OP", two, i))
+            i += 2
+            continue
         if ch in _ONE_CHAR_OPS:
-            tokens.append(Token("OP", ch, i)); i += 1; continue
+            tokens.append(Token("OP", ch, i))
+            i += 1
+            continue
 
         # Strings
         if ch == '"':
@@ -87,7 +98,10 @@ def tokenize(src: str) -> list[Token]:
             while i < n and (src[i].isdigit() or src[i] == "."):
                 i += 1
             text = src[start:i]
-            value: float | int = float(text) if "." in text else int(text)
+            try:
+                value: float | int = float(text) if "." in text else int(text)
+            except ValueError as exc:
+                raise LexError(f"invalid numeric literal {text!r}", start) from exc
             tokens.append(Token("NUMBER", value, start))
             continue
 
