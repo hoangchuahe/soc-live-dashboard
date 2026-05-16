@@ -50,7 +50,9 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const q = params.get('q')
-    const p = (params.get('preset') ?? '15m') as Preset
+    const raw = params.get('preset')
+    const valid = new Set(['5m', '15m', '1h', '24h'])
+    const p: Preset = raw && valid.has(raw) ? (raw as Preset) : '15m'
     if (q) setPivot({ open: true, query: q, preset: p })
   }, [])
 
