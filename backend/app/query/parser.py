@@ -115,7 +115,7 @@ class _Parser:
             return inner
         if tok.kind == "IDENT":
             return self.parse_compare()
-        raise ParseError(f"expected field or '(' , got {tok.kind}", tok.position)
+        raise ParseError(f"expected field or '(', got {tok.kind}", tok.position)
 
     def parse_compare(self) -> Compare:
         field = self.parse_field()
