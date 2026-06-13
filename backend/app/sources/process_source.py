@@ -66,7 +66,7 @@ class ProcessSource:
             action="process_start",
             outcome="unknown",
             severity="low",
-            module="winevent",
+            module="psutil",
             message=f"Process started: {name} (pid={info.get('pid')})",
             host_name=self._host,
             process_name=name,

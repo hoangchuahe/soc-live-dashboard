@@ -44,7 +44,7 @@ class Producer:
         self._alert_buffer = alert_buffer
         self._persist = persist_event
         self._index = index_event
-        self._lifecycle = create_alert_lifecycle or (lambda _id: _default_noop({}))
+        self._lifecycle = create_alert_lifecycle or _default_noop
         self._base_interval = base_interval
         self._clock = clock
         self._tick = 0
