@@ -12,6 +12,7 @@ export interface EcsEvent {
     outcome?: 'success' | 'failure' | 'unknown'
     severity: 'low' | 'medium' | 'high' | 'critical'
     module?: string            // winevent | syslog | netflow | cef
+    dataset?: string           // windows.security | host.network | host.process | host.metrics | simulator.attack
   }
   source?: {
     ip?: string
@@ -31,6 +32,7 @@ export interface EcsEvent {
   rule?: { id: string; name: string }       // populated only on alerts
   log?: { original?: string; level?: string }
   message: string
+  labels?: { provenance?: 'live' | 'simulated' }
   matched_count?: number
   entity?: string
   triggering_event_id?: string
@@ -73,6 +75,11 @@ export interface WsFrame {
   alerts: EcsEvent[]
 }
 
+export interface HealthStatus {
+  mode: 'demo' | 'live' | 'blend'
+  sources: { name: string; available: boolean; detail: string }[]
+}
+
 export interface CveItem {
   id: string
   description: string
@@ -94,6 +101,7 @@ export interface AttackArc {
   lng: number
   severity: string
   count: number
+  provenance?: 'live' | 'simulated'
 }
 
 export interface RiskEntity {
@@ -131,4 +139,8 @@ export const ecs = {
   format:   (e: EcsEvent) => e.event.module ?? 'unknown',
   count:    (e: EcsEvent) => e.matched_count ?? 1,
   isAlert:  (e: EcsEvent) => e.event.kind === 'alert',
+  provenance: (e: EcsEvent): 'live' | 'simulated' =>
+    e.labels?.provenance === 'simulated' ? 'simulated' : 'live',
+  isSimulated: (e: EcsEvent) => e.labels?.provenance === 'simulated',
+  dataset:    (e: EcsEvent) => e.event.dataset ?? null,
 }
