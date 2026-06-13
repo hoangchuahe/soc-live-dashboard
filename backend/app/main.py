@@ -24,7 +24,7 @@ Pipeline per WebSocket tick:
 from __future__ import annotations
 
 import asyncio
-import json
+import os
 from collections import deque
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -44,10 +44,13 @@ from .auth import (
     require_admin,
 )
 from .detection import DetectionEngine, load_rules
+from .hub import ConnectionHub
 from .mitre_data import TACTICS_ORDER, TECHNIQUES
+from .producer import Producer
 from .query import ParseError, evaluate, parse
 from .risk import RiskTracker
-from .simulator import get_topology, maybe_event, next_metrics
+from .simulator import get_topology
+from .sources import build_metrics_provider, build_sources
 from .threat_intel import fetch_recent_cves
 
 # ── Globals ───────────────────────────────────────────────────────────────────
@@ -59,7 +62,11 @@ detection_engine = DetectionEngine(load_rules(), risk_tracker)
 _event_buffer: deque[dict] = deque(maxlen=500)
 _alert_buffer: deque[dict] = deque(maxlen=200)
 
-_tick = 0
+hub = ConnectionHub()
+_producer: Producer | None = None
+_producer_task: asyncio.Task | None = None
+_mode: str = "blend"            # actual value resolved from SOC_MODE in lifespan()
+_source_statuses: list = []
 
 
 # ── App lifecycle ─────────────────────────────────────────────────────────────
@@ -84,7 +91,37 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[startup] backfill skipped: {exc}")
 
+    # Build sources for the configured mode and start the single producer.
+    global _producer, _producer_task, _source_statuses, _mode
+    _mode = os.getenv("SOC_MODE", "blend")
+    sources, _source_statuses = build_sources(_mode)
+    metrics_provider = build_metrics_provider(_mode)
+    _producer = Producer(
+        sources=sources,
+        metrics_provider=metrics_provider,
+        engine=detection_engine,
+        hub=hub,
+        event_buffer=_event_buffer,
+        alert_buffer=_alert_buffer,
+        persist_event=db.persist_event,
+        index_event=elastic.index_event,
+        create_alert_lifecycle=db.create_alert_lifecycle,
+    )
+    active = ", ".join(s.name for s in sources) or "none"
+    print(f"[startup] SOC_MODE={_mode}; active sources: {active}")
+    _producer_task = asyncio.create_task(_producer.run_forever())
+
     yield
+
+    # Shutdown: stop the producer cleanly.
+    if _producer is not None:
+        _producer.stop()
+    if _producer_task is not None:
+        _producer_task.cancel()
+        try:
+            await _producer_task
+        except (asyncio.CancelledError, Exception):
+            pass
 
 
 app = FastAPI(
@@ -111,6 +148,11 @@ app.add_middleware(
 async def health():
     return {
         "status": "ok",
+        "mode": _mode,
+        "sources": [
+            {"name": st.name, "available": st.available, "detail": st.detail}
+            for st in _source_statuses
+        ],
         "elasticsearch": elastic.is_available(),
         "rules_loaded": len(detection_engine.rules),
         "events_buffered": len(_event_buffer),
@@ -313,53 +355,16 @@ async def prune(days: int = Query(7, ge=1, le=90), user: UserInfo = Depends(requ
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    global _tick
     await websocket.accept()
-    metrics.websocket_clients.set(metrics.websocket_clients._value + 1)
-
+    await hub.register(websocket)
+    metrics.websocket_clients.set(hub.count)
     try:
+        # The Producer broadcasts frames; this coroutine just keeps the socket
+        # open and waits for the client to disconnect.
         while True:
-            _tick += 1
-
-            event = maybe_event()
-            fired_alerts: list[dict] = []
-
-            if event:
-                _event_buffer.append(event)
-                metrics.events_ingested.inc(
-                    category=event["event"]["category"],
-                    severity=event["event"]["severity"],
-                )
-
-                # Run through detection engine
-                detections = detection_engine.evaluate(event)
-                for det in detections:
-                    alert = det.to_ecs()
-                    fired_alerts.append(alert)
-                    _alert_buffer.append(alert)
-                    metrics.detections_fired.inc(
-                        rule_id=det.rule_id,
-                        tactic=det.tactic or "unknown",
-                    )
-
-                # Persist to SQLite + ES (best-effort, never blocks the tick)
-                asyncio.create_task(db.persist_event(event))
-                asyncio.create_task(elastic.index_event(event))
-                for alert in fired_alerts:
-                    asyncio.create_task(db.persist_event(alert))
-                    asyncio.create_task(db.create_alert_lifecycle(alert["event"]["id"]))
-                    asyncio.create_task(elastic.index_event(alert))
-
-            frame = {
-                "tick": _tick,
-                "metrics": next_metrics(),
-                "event": event,
-                "alerts": fired_alerts,
-            }
-            await websocket.send_text(json.dumps(frame, default=str))
-            await asyncio.sleep(1)
-
+            await websocket.receive_text()
     except WebSocketDisconnect:
         pass
     finally:
-        metrics.websocket_clients.set(max(0, metrics.websocket_clients._value - 1))
+        hub.unregister(websocket)
+        metrics.websocket_clients.set(hub.count)
