@@ -31,16 +31,16 @@ def make_event(
     *,
     event_id: str,
     timestamp: str,
-    category: str,            # authentication | network | malware | configuration | intrusion_detection
-    action: str,              # auth_failure | scan | lateral_movement | beacon | policy_violation | anomaly
-    outcome: str,             # success | failure | unknown
-    severity: str,            # low | medium | high | critical
-    module: str,              # winevent | syslog | netflow | cef
+    category: str,
+    action: str,
+    outcome: str,
+    severity: str,
+    module: str,
     message: str,
-    source_ip: str,
-    source_country: str,
-    source_lat: float,
-    source_lon: float,
+    source_ip: str | None = None,
+    source_country: str | None = None,
+    source_lat: float | None = None,
+    source_lon: float | None = None,
     destination_ip: str | None = None,
     host_name: str | None = None,
     user_name: str | None = None,
@@ -49,6 +49,8 @@ def make_event(
     technique_id: str | None = None,
     technique_name: str | None = None,
     log_original: str | None = None,
+    provenance: str = "live",
+    dataset: str | None = None,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     evt: dict[str, Any] = {
@@ -62,15 +64,20 @@ def make_event(
             "severity": severity,
             "module": module,
         },
-        "source": {
-            "ip": source_ip,
-            "geo": {
-                "country_name": source_country,
-                "location": {"lat": source_lat, "lon": source_lon},
-            },
-        },
         "message": message,
     }
+
+    if dataset:
+        evt["event"]["dataset"] = dataset
+
+    if source_ip:
+        src: dict[str, Any] = {"ip": source_ip}
+        if source_country and source_lat is not None and source_lon is not None:
+            src["geo"] = {
+                "country_name": source_country,
+                "location": {"lat": source_lat, "lon": source_lon},
+            }
+        evt["source"] = src
 
     if destination_ip:
         evt["destination"] = {"ip": destination_ip}
@@ -87,6 +94,9 @@ def make_event(
         }
     if log_original:
         evt["log"] = {"original": log_original, "level": severity}
+
+    if provenance == "simulated":
+        evt["labels"] = {"provenance": provenance}
 
     if extra:
         evt.update(extra)
