@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
 import { Header } from './components/Layout'
 import { DashboardView } from './components/DashboardView'
 import { SearchPanel } from './components/SearchPanel'
 import { UiProvider } from './context/UiContext'
+import { useUi } from './context/UiContext'
+import { matchesProvenance } from './lib/provenance'
 import type { Preset } from './lib/timeRange'
 import { ecs } from './types'
 import type { MetricPoint, NetworkNode, NetworkEdge, EcsEvent, Metrics, AttackArc } from './types'
@@ -23,6 +25,9 @@ export default function App() {
 
 function AppInner() {
   const { frame, status } = useWebSocket(WS_URL)
+  const ui = useUi()
+  const pausedRef = useRef(ui.livePaused)
+  useEffect(() => { pausedRef.current = ui.livePaused }, [ui.livePaused])
 
   const [history, setHistory] = useState<MetricPoint[]>([])
   const [metrics, setMetrics] = useState<Metrics | null>(null)
@@ -52,14 +57,14 @@ function AppInner() {
       setEvents(evts)
       setArcs(evts.filter(e => ecs.lat(e) || ecs.lon(e)).slice(-MAX_ARCS).map(e => ({
         id: e.event.id, country: ecs.country(e), lat: ecs.lat(e), lng: ecs.lon(e),
-        severity: ecs.severity(e), count: ecs.count(e),
+        severity: ecs.severity(e), count: ecs.count(e), provenance: ecs.provenance(e),
       })))
     }).catch(() => {})
     fetch('/api/alerts').then(r => r.json()).then(d => setAlerts(d.alerts ?? [])).catch(() => {})
   }, [])
 
   useEffect(() => {
-    if (!frame) return
+    if (!frame || pausedRef.current) return
     setMetrics(frame.metrics)
     setHistory(prev => {
       const pt: MetricPoint = { tick: frame.tick, cpu: frame.metrics.cpu_percent, memory: frame.metrics.memory_percent, networkIn: frame.metrics.network_in_mbps, networkOut: frame.metrics.network_out_mbps }
@@ -72,7 +77,7 @@ function AppInner() {
       const lat = ecs.lat(e), lon = ecs.lon(e)
       if (lat || lon) {
         setArcs(prev => {
-          const next: AttackArc[] = [...prev, { id: e.event.id, country: ecs.country(e), lat, lng: lon, severity: ecs.severity(e), count: ecs.count(e) }]
+          const next: AttackArc[] = [...prev, { id: e.event.id, country: ecs.country(e), lat, lng: lon, severity: ecs.severity(e), count: ecs.count(e), provenance: ecs.provenance(e) }]
           return next.length > MAX_ARCS ? next.slice(-MAX_ARCS) : next
         })
       }
@@ -82,12 +87,16 @@ function AppInner() {
     }
   }, [frame])
 
+  const fEvents = events.filter(e => matchesProvenance(e, ui.provenance))
+  const fAlerts = alerts.filter(e => matchesProvenance(e, ui.provenance))
+  const fArcs = arcs.filter(a => ui.provenance === 'all' || (a.provenance ?? 'live') === ui.provenance)
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">
       <Header status={status} />
       <DashboardView
-        metrics={metrics} history={history} events={events} alerts={alerts}
-        arcs={arcs} nodes={nodes} edges={edges}
+        metrics={metrics} history={history} events={fEvents} alerts={fAlerts}
+        arcs={fArcs} nodes={nodes} edges={edges}
         onPivot={(query) => setPivot({ open: true, query, preset: '15m' })}
       />
       <SearchPanel
