@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
-import { Header } from './components/Layout'
+import { DashboardHeader } from './components/header/DashboardHeader'
 import { DashboardView } from './components/DashboardView'
-import { SearchPanel } from './components/SearchPanel'
-import { UiProvider } from './context/UiContext'
-import { useUi } from './context/UiContext'
+import { DiscoverView } from './components/discover/DiscoverView'
+import { UiProvider, useUi } from './context/UiContext'
+import type { RangePreset } from './context/UiContext'
 import { matchesProvenance } from './lib/provenance'
-import type { Preset } from './lib/timeRange'
 import { ecs } from './types'
 import type { MetricPoint, NetworkNode, NetworkEdge, EcsEvent, Metrics, AttackArc } from './types'
 
@@ -26,8 +25,6 @@ export default function App() {
 function AppInner() {
   const { frame, status } = useWebSocket(WS_URL)
   const ui = useUi()
-  const pausedRef = useRef(ui.livePaused)
-  useEffect(() => { pausedRef.current = ui.livePaused }, [ui.livePaused])
 
   const [history, setHistory] = useState<MetricPoint[]>([])
   const [metrics, setMetrics] = useState<Metrics | null>(null)
@@ -36,15 +33,19 @@ function AppInner() {
   const [nodes, setNodes]     = useState<NetworkNode[]>([])
   const [edges, setEdges]     = useState<NetworkEdge[]>([])
   const [arcs, setArcs]       = useState<AttackArc[]>([])
-  const [pivot, setPivot] = useState<{ open: boolean; query: string; preset: Preset }>({ open: false, query: '', preset: '15m' })
 
+  const pausedRef = useRef(ui.livePaused)
+  useEffect(() => { pausedRef.current = ui.livePaused }, [ui.livePaused])
+
+  // Deep-link: ?q=&preset= opens Discover with the query
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const q = params.get('q')
     const raw = params.get('preset')
-    const valid = new Set(['5m', '15m', '1h', '24h'])
-    const p: Preset = raw && valid.has(raw) ? (raw as Preset) : '15m'
-    if (q) setPivot({ open: true, query: q, preset: p })
+    const valid = new Set<RangePreset>(['5m', '15m', '1h', '24h'])
+    if (raw && valid.has(raw as RangePreset)) ui.setPreset(raw as RangePreset)
+    if (q) ui.openDiscoverWith(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -93,16 +94,10 @@ function AppInner() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">
-      <Header status={status} />
-      <DashboardView
-        metrics={metrics} history={history} events={fEvents} alerts={fAlerts}
-        arcs={fArcs} nodes={nodes} edges={edges}
-        onPivot={(query) => setPivot({ open: true, query, preset: '15m' })}
-      />
-      <SearchPanel
-        open={pivot.open} initialQuery={pivot.query} initialPreset={pivot.preset}
-        onClose={() => setPivot(s => ({ ...s, open: false }))}
-      />
+      <DashboardHeader status={status} />
+      {ui.view === 'dashboard'
+        ? <DashboardView metrics={metrics} history={history} events={fEvents} alerts={fAlerts} arcs={fArcs} nodes={nodes} edges={edges} onPivot={(query) => ui.openDiscoverWith(query)} />
+        : <DiscoverView />}
     </div>
   )
 }
