@@ -1,5 +1,6 @@
 import type { EcsEvent } from '../types'
 import { ecs } from '../types'
+import { SimChip } from './SimChip'
 
 interface Props {
   events: EcsEvent[]
@@ -43,6 +44,7 @@ export function AlertFeed({ events, onPivot }: Props) {
                     ALERT
                   </span>
                 )}
+                {ecs.isSimulated(e) && <SimChip />}
                 {ecs.technique(e) && (
                   <span className="text-[9px] font-mono text-purple-400">{ecs.technique(e)}</span>
                 )}
