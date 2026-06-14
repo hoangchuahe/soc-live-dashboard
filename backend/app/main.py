@@ -146,13 +146,25 @@ app.add_middleware(
 
 @app.get("/health", tags=["Health"])
 async def health():
+    # Merge startup preflight status with the producer's live failure tracking:
+    # a source that fails repeatedly at runtime is reported unavailable + degraded.
+    runtime = _producer.source_status() if _producer is not None else {}
+    sources = []
+    for st in _source_statuses:
+        r = runtime.get(st.name)
+        degraded = bool(r and r["degraded"])
+        sources.append({
+            "name": st.name,
+            "available": st.available and not degraded,
+            "detail": (
+                f"degraded: {r['consecutive_failures']} consecutive poll failures"
+                if degraded and r else st.detail
+            ),
+        })
     return {
         "status": "ok",
         "mode": _mode,
-        "sources": [
-            {"name": st.name, "available": st.available, "detail": st.detail}
-            for st in _source_statuses
-        ],
+        "sources": sources,
         "elasticsearch": elastic.is_available(),
         "rules_loaded": len(detection_engine.rules),
         "events_buffered": len(_event_buffer),
