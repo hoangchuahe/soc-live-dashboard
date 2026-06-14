@@ -1,5 +1,8 @@
+import type { RangePreset } from '../../context/UiContext'
+
 interface Props {
   query: string
+  preset: RangePreset
   onQueryChange: (q: string) => void
   onRun: () => void
   loading: boolean
@@ -7,10 +10,11 @@ interface Props {
   matched: number
 }
 
-export function SearchBar({ query, onQueryChange, onRun, loading, error, matched }: Props) {
+export function SearchBar({ query, preset, onQueryChange, onRun, loading, error, matched }: Props) {
   function copyLink() {
     const u = new URL(window.location.href)
     u.searchParams.set('q', query)
+    u.searchParams.set('preset', preset)
     void navigator.clipboard.writeText(u.toString())
   }
 

@@ -64,7 +64,7 @@ export function DiscoverView() {
           <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Discover</h2>
         </div>
-        <SearchBar query={ui.discoverQuery} onQueryChange={ui.setDiscoverQuery} onRun={() => void run()} loading={loading} error={error} matched={matched} />
+        <SearchBar query={ui.discoverQuery} preset={ui.preset} onQueryChange={ui.setDiscoverQuery} onRun={() => void run()} loading={loading} error={error} matched={matched} />
         <div className="p-2 border-b border-slate-800"><EventHistogram buckets={buckets} /></div>
         <div className="flex-1 overflow-auto"><ResultsTable results={filtered} /></div>
       </div>
