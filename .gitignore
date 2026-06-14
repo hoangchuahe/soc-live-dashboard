@@ -24,3 +24,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Superpowers process docs (brainstorming specs / implementation plans) — not tracked
+docs/superpowers/
