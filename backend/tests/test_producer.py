@@ -119,3 +119,44 @@ async def test_failing_source_does_not_break_tick():
     frames = await prod.tick()      # must not raise
     assert len(frames) == 1
     assert frames[0]["event"] is None
+
+
+async def test_source_degrades_after_consecutive_failures():
+    class _Boom(_StaticSource):
+        def poll(self):
+            self.poll_count += 1
+            raise RuntimeError("kaboom")
+
+    boom = _Boom("boom", [], interval=1.0)
+    times = iter([1000.0, 1001.0, 1002.0, 1003.0])   # advance so the 1s source is due each tick
+    prod = _make_producer([boom], clock=lambda: next(times))
+    for _ in range(3):
+        await prod.tick()
+    status = prod.source_status()["boom"]
+    assert status["consecutive_failures"] == 3
+    assert status["degraded"] is True
+
+
+async def test_degraded_source_recovers_on_success():
+    class _Flaky(_StaticSource):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.fail = True
+
+        def poll(self):
+            self.poll_count += 1
+            if self.fail:
+                raise RuntimeError("transient")
+            return []
+
+    flaky = _Flaky("flaky", [], interval=1.0)
+    times = iter([1000.0, 1001.0, 1002.0, 1003.0, 1004.0])
+    prod = _make_producer([flaky], clock=lambda: next(times))
+    for _ in range(3):
+        await prod.tick()
+    assert prod.source_status()["flaky"]["degraded"] is True
+
+    flaky.fail = False
+    await prod.tick()                                # next poll succeeds
+    assert prod.source_status()["flaky"]["degraded"] is False
+    assert prod.source_status()["flaky"]["consecutive_failures"] == 0

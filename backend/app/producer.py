@@ -21,6 +21,9 @@ async def _default_noop(_event: dict) -> None:
 class Producer:
     """Single background loop: poll due sources -> detect -> buffer -> broadcast."""
 
+    # consecutive failed polls before a source is reported "degraded" via /health
+    DEGRADED_AFTER = 3
+
     def __init__(
         self,
         *,
@@ -49,11 +52,25 @@ class Producer:
         self._clock = clock
         self._tick = 0
         self._next_due: dict[str, float] = {s.name: 0.0 for s in self._sources}
+        self._consecutive_failures: dict[str, int] = {s.name: 0 for s in self._sources}
         self._running = False
 
     @property
     def event_buffer_len(self) -> int:
         return len(self._event_buffer)
+
+    def source_status(self) -> dict[str, dict[str, int | bool]]:
+        """Per-source runtime health for /health:
+        {name: {"degraded": bool, "consecutive_failures": int}}.
+        A source is degraded after DEGRADED_AFTER consecutive failed polls.
+        """
+        return {
+            name: {
+                "degraded": fails >= self.DEGRADED_AFTER,
+                "consecutive_failures": fails,
+            }
+            for name, fails in self._consecutive_failures.items()
+        }
 
     async def _poll_due_sources(self) -> list[dict]:
         now = self._clock()
@@ -64,8 +81,11 @@ class Producer:
             self._next_due[src.name] = now + src.interval_seconds
             try:
                 events = await asyncio.to_thread(src.poll)
+                self._consecutive_failures[src.name] = 0
             except Exception as exc:
-                print(f"[producer] source {src.name} poll failed: {exc!r}")
+                fails = self._consecutive_failures.get(src.name, 0) + 1
+                self._consecutive_failures[src.name] = fails
+                print(f"[producer] source {src.name} poll failed ({fails}x): {exc!r}")
                 events = []
             collected.extend(events or [])
         return collected
