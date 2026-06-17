@@ -1,0 +1,12 @@
+**/__pycache__/
+**/*.pyc
+.git/
+.github/
+docs/
+backend/tests/
+backend/soc.db
+**/*.db
+frontend/node_modules/
+frontend/dist/
+.venv/
+.pre-commit-config.yaml
