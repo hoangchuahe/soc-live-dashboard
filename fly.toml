@@ -1,0 +1,28 @@
+app = "soc-live-dashboard"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[env]
+  SOC_MODE = "demo"
+  STATIC_DIR = "/app/static"
+  ELASTICSEARCH_URL = ""
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
