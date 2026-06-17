@@ -6,6 +6,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-39%20passing-brightgreen.svg)](backend/tests)
 
+**🔗 Live demo:** [soc-live-dashboard.fly.dev](https://soc-live-dashboard.fly.dev) — log in with `admin` / `admin` (admin) or `viewer` / `viewer` (read-only). Runs in simulator mode; data resets on redeploy.
+
 A real-time Security Operations Centre dashboard with **Sigma-style detection
 rules**, **risk-based alerting**, **JWT auth + RBAC**, and **ECS-formatted events**
 — built end-to-end with FastAPI WebSockets, React, and D3.js.
@@ -255,33 +257,24 @@ Override credentials via env vars `ADMIN_PASSWORD`, `VIEWER_PASSWORD`,
 
 ---
 
-## Deployment (Fly.io — recommended free tier)
+## Deployment (Fly.io)
+
+Deployed as a single container: a multi-stage `Dockerfile` builds the React SPA
+and FastAPI serves it alongside the API and WebSocket — one origin, no nginx.
+Runs in `SOC_MODE=demo` (simulator); SQLite is ephemeral.
 
 ```bash
-# install flyctl
-curl -L https://fly.io/install.sh | sh
-
-# from repo root
-fly launch --name soc-live-dashboard --no-deploy
-fly secrets set \
-  JWT_SECRET="$(openssl rand -hex 32)" \
-  ADMIN_PASSWORD="$(openssl rand -hex 16)" \
-  VIEWER_PASSWORD="viewer"
-fly deploy
+# install flyctl, then from the repo root:
+fly auth login
+fly apps create soc-live-dashboard            # pick a free name if taken
+fly secrets set JWT_SECRET="$(openssl rand -hex 32)"
+fly deploy                                    # uses fly.toml + Dockerfile
+fly open                                       # opens the live URL
 ```
 
-The app fits comfortably in Fly's free tier (256 MB RAM, shared CPU). The
-SQLite database persists via a Fly volume; configure with:
-
-```bash
-fly volumes create soc_data --size 1
-fly config save
-# add to fly.toml:  [mounts] source = "soc_data"  destination = "/data"
-# update DATABASE_URL: sqlite+aiosqlite:////data/soc.db
-```
-
-For Render or Railway, point the service at `./backend` with start command
-`uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+Demo credentials are intentionally public (`admin`/`admin`, `viewer`/`viewer`).
+`JWT_SECRET` is set to a random value so tokens can't be forged against the
+default. The app scales to zero when idle and wakes in ~1-3s on the next request.
 
 ---
 
