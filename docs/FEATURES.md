@@ -178,7 +178,10 @@
 | CVE feed | `CveFeed.tsx` | CVSS-coloured, click-through to nvd.nist.gov |
 | Log viewer | `LogViewer.tsx` | Raw winevent / syslog / cef / netflow lines |
 | Alert feed | `AlertFeed.tsx` | Combined events + alerts, severity badges, technique IDs |
-| Tabbed panels | `App.tsx` | Timeline / Logs / Risk / Rules switchable |
+| Grafana-style header | `header/DashboardHeader.tsx` | Time-range, refresh, app-wide provenance filter, SIM/live mode indicator |
+| Discover view | `discover/DiscoverView.tsx` | DSL search bar + D3 event histogram + results table, auto-refresh |
+| Dashboard / Discover view switch | `App.tsx` | Header toggle; alert pivots deep-link into Discover |
+| Tabbed panels | `DashboardView.tsx` | Timeline / Logs / Risk / Rules switchable |
 | Tailwind dark theme | `index.css` | Monospace SOC aesthetic, scanline overlay, pulse-ring animation |
 | ECS field accessor helpers | `types/index.ts` | `ecs.*` namespace flattens nested ECS for D3 components |
 

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-39%20passing-brightgreen.svg)](backend/tests)
+[![Tests](https://img.shields.io/badge/tests-197%20passing-brightgreen.svg)](backend/tests)
 
 **🔗 Live demo:** [soc-live-dashboard.fly.dev](https://soc-live-dashboard.fly.dev) — log in with `admin` / `admin` (admin) or `viewer` / `viewer` (read-only). Runs in simulator mode; data resets on redeploy.
 
@@ -215,8 +215,10 @@ OpenAPI spec auto-generated at `/docs` (Swagger UI) and `/redoc`.
 
 ### Querying events — the DSL
 
-Click the 🔍 button on any alert in the feed to open the investigation drawer
-pre-filled with `source.ip:"…"`. The same query language drives `/api/search`:
+Open the **Discover** view from the header toolbar to search events with a live
+event histogram and a results table. Each alert in the feed also has a pivot
+button that jumps straight to Discover pre-filled with `source.ip:"…"`. The same
+query language drives `/api/search`:
 
 ```
 GET /api/search?q=<dsl>&from=<iso>&to=<iso>&limit=N

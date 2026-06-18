@@ -83,8 +83,9 @@ AST evaluator, all in [`backend/app/query/`](../backend/app/query) — and runs 
 resulting predicate against events in SQLite, scoped to a time window. The AST
 is the storage-agnostic indirection layer: if events later move to a different
 store, only the evaluator changes. The previous ES passthrough is preserved at
-`GET /api/search/es`. Frontend exposes the same DSL through a pivot button on
-each alert that opens a side drawer pre-filled with `source.ip:"…"`.
+`GET /api/search/es`. The frontend exposes the same DSL through a dedicated
+**Discover** view (search bar + D3 event histogram + results table); a pivot
+button on each alert deep-links into Discover pre-filled with `source.ip:"…"`.
 
 ## What's deliberately *not* in this build
 
