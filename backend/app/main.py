@@ -32,6 +32,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import Body, Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import db, elastic, metrics
 from .auth import (
@@ -380,3 +381,24 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         hub.unregister(websocket)
         metrics.websocket_clients.set(hub.count)
+
+
+# ── Static SPA (built frontend) ───────────────────────────────────────────────
+# Mounted LAST so the catch-all "/" never shadows the API, WS, or ops routes.
+# Skipped automatically when STATIC_DIR is absent (local dev / tests / CI), so
+# only the production image — which copies the built dist into /app/static —
+# actually serves the SPA. No client-side routing exists, so html=True suffices.
+
+def mount_spa(app: FastAPI, static_dir: str) -> bool:
+    """Mount the built SPA at / if static_dir exists. Returns True if mounted.
+
+    Must be called after all API/WS routes are registered: Starlette resolves
+    routes in registration order, so this "/" mount acts as the final fallback.
+    """
+    if os.path.isdir(static_dir):
+        app.mount("/", StaticFiles(directory=static_dir, html=True), name="spa")
+        return True
+    return False
+
+
+mount_spa(app, os.getenv("STATIC_DIR", "/app/static"))
