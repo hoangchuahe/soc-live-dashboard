@@ -186,3 +186,32 @@ def test_campaign_director_emits_ordered_chain():
     # Every event in the campaign shares ONE host (the join key).
     hosts = {ev["host"]["name"] for batch in batches for ev in batch}
     assert len(hosts) == 1
+
+
+def test_campaign_produces_one_correlated_detection():
+    """The shipped campaign, fed through the real engine + correlation rule,
+    yields exactly one multi-stage intrusion alert for the victim host."""
+    from app.detection import DetectionEngine, load_rules
+    from app.detection.correlation import CorrelationEngine, load_correlation_rules
+    from app.simulator import CampaignDirector
+
+    risk = RiskTracker()
+    engine = DetectionEngine(load_rules(), risk)
+    corr = CorrelationEngine(
+        load_correlation_rules({r.id for r in engine.rules}), risk
+    )
+    director = CampaignDirector(start_probability=1.0)
+
+    correlated = []
+    for _ in range(4):                       # 4 stages = 4 polls drain one campaign
+        for ev in director.poll():
+            correlated += corr.ingest(ev, engine.evaluate(ev))
+
+    multistage = [c for c in correlated if c.rule_id == "corr-0001-multistage-intrusion"]
+    assert len(multistage) == 1
+    assert [s["rule_id"] for s in multistage[0].stages] == [
+        "rule-0001-auth-brute",
+        "rule-0003-lateral-rdp",
+        "rule-0004-c2-beacon",
+        "rule-0006-exfil-volume",
+    ]
