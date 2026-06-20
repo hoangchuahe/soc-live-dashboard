@@ -15,7 +15,7 @@ def test_event_source_tags_simulated(monkeypatch):
                   "severity": "low"}, "message": "m"}
     monkeypatch.setattr("app.sources.simulator_source.maybe_event", lambda: fake_event)
 
-    events = SimulatorEventSource().poll()
+    events = SimulatorEventSource(campaign_probability=0.0).poll()
 
     assert len(events) == 1
     assert events[0]["labels"] == {"provenance": "simulated"}
@@ -24,7 +24,7 @@ def test_event_source_tags_simulated(monkeypatch):
 
 def test_event_source_empty_when_no_event(monkeypatch):
     monkeypatch.setattr("app.sources.simulator_source.maybe_event", lambda: None)
-    assert SimulatorEventSource().poll() == []
+    assert SimulatorEventSource(campaign_probability=0.0).poll() == []
 
 
 def test_metrics_provider_is_a_metrics_provider():

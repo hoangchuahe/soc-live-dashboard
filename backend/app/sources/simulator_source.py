@@ -14,8 +14,8 @@ class SimulatorEventSource:
     dataset = "simulator.attack"
     interval_seconds = 1.0
 
-    def __init__(self) -> None:
-        self._director = CampaignDirector()
+    def __init__(self, campaign_probability: float = 0.04) -> None:
+        self._director = CampaignDirector(start_probability=campaign_probability)
 
     def preflight(self) -> SourceStatus:
         return SourceStatus(name=self.name, available=True, detail="ok")
