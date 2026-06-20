@@ -44,7 +44,12 @@ from .auth import (
     current_user,
     require_admin,
 )
-from .detection import DetectionEngine, load_rules
+from .detection import (
+    CorrelationEngine,
+    DetectionEngine,
+    load_correlation_rules,
+    load_rules,
+)
 from .hub import ConnectionHub
 from .mitre_data import TACTICS_ORDER, TECHNIQUES
 from .producer import Producer
@@ -58,6 +63,10 @@ from .threat_intel import fetch_recent_cves
 
 risk_tracker = RiskTracker()
 detection_engine = DetectionEngine(load_rules(), risk_tracker)
+correlation_engine = CorrelationEngine(
+    load_correlation_rules({r.id for r in detection_engine.rules}),
+    risk_tracker,
+)
 
 # Ring buffer — last N events for replay on reconnect (lightweight WAL)
 _event_buffer: deque[dict] = deque(maxlen=500)
@@ -75,6 +84,7 @@ _source_statuses: list = []
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"[startup] loaded {len(detection_engine.rules)} detection rules")
+    print(f"[startup] loaded {len(correlation_engine.rules)} correlation rules")
     await db.init_db()
     print("[startup] sqlite initialised")
     await elastic.startup()
@@ -101,6 +111,7 @@ async def lifespan(app: FastAPI):
         sources=sources,
         metrics_provider=metrics_provider,
         engine=detection_engine,
+        correlation_engine=correlation_engine,
         hub=hub,
         event_buffer=_event_buffer,
         alert_buffer=_alert_buffer,
