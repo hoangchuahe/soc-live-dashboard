@@ -275,14 +275,16 @@ Reproduced from the README for self-contained reference.
 | ECS-shaped events | ✓ | — | ✓ | — | — |
 | Sigma-style YAML detection rules | ✓ | ✓¹ | ✓¹ | — | — |
 | Threshold / sliding-window detection | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Multi-stage correlation | ✓ | ✓ | ✓ | ~ | ✓ |
 | MITRE ATT&CK tagging | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Risk-Based Alerting | ✓ | ✓ | ~² | — | ✓ |
 | Real-time push to UI | ✓ (WS) | ✓ (XHR) | ✓ (XHR) | ✓ | ✓ |
 | Real CVE / threat intel feed | ✓ NVD | ✓ | ✓ | — | ✓ |
 | Geospatial attack map | ✓ | ✓ | ✓ | — | ✓ |
-| Custom query language | — | SPL | KQL/EQL | — | KQL |
+| Custom query language | ✓³ | SPL | KQL/EQL | — | KQL |
 | Multi-tenant / RBAC | — | ✓ | ✓ | ✓ | ✓ |
 | Distributed ingestion | — | ✓ | ✓ | ✓ | ✓ |
 
 ¹ via Sigma compilers (`pySigma`, Splunk app)
 ² Risk Engine in beta
+³ a substring / field / numeric DSL (`AND`/`OR`/`NOT`) with a Discover view — intentionally simpler than SPL/KQL
