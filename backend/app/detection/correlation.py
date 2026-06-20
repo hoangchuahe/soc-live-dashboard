@@ -67,7 +67,7 @@ def load_correlation_rules(
         if not group_by:
             print(f"[correlation] skip {rid}: missing 'group-by'")
             continue
-        if not isinstance(timespan, int) or timespan <= 0:
+        if isinstance(timespan, bool) or not isinstance(timespan, int) or timespan <= 0:
             print(f"[correlation] skip {rid}: bad 'timespan' {timespan!r}")
             continue
         unknown = [s for s in stage_ids if s not in base_rule_ids]

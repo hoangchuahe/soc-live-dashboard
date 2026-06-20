@@ -52,6 +52,24 @@ def test_loader_skips_unknown_base_rule(tmp_path):
     assert rules == []
 
 
+def test_loader_skips_boolean_timespan(tmp_path):
+    _write(tmp_path, "booltimespan.yml",
+        "id: corr-b\ntitle: B\ncorrelation:\n  type: temporal_ordered\n"
+        "  rules: [rule-0001-auth-brute]\n  group-by: host.name\n  timespan: true\n",
+    )
+    rules = load_correlation_rules({"rule-0001-auth-brute"}, directory=tmp_path)
+    assert rules == []
+
+
+def test_loader_skips_missing_group_by(tmp_path):
+    _write(tmp_path, "nogroup.yml",
+        "id: corr-g\ntitle: G\ncorrelation:\n  type: temporal_ordered\n"
+        "  rules: [rule-0001-auth-brute]\n  timespan: 600\n",
+    )
+    rules = load_correlation_rules({"rule-0001-auth-brute"}, directory=tmp_path)
+    assert rules == []
+
+
 def test_loader_skips_bad_type_and_timespan(tmp_path):
     _write(tmp_path, "type.yml",
         "id: corr-t\ntitle: T\ncorrelation:\n  type: nope\n"
