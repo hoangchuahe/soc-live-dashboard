@@ -2,6 +2,16 @@
 // The backend emits events conforming to ECS:
 //   https://www.elastic.co/guide/en/ecs/current/
 
+export interface CorrelationStage {
+  rule_id: string
+  title: string
+  technique_id?: string | null
+  technique_name?: string | null
+  tactic?: string | null
+  triggering_event_id?: string
+  timestamp?: string
+}
+
 export interface EcsEvent {
   '@timestamp': string
   event: {
@@ -36,6 +46,7 @@ export interface EcsEvent {
   matched_count?: number
   entity?: string
   triggering_event_id?: string
+  correlation?: { rule_id: string; stages: CorrelationStage[] }
 }
 
 export interface MetricPoint {
@@ -143,4 +154,6 @@ export const ecs = {
     e.labels?.provenance === 'simulated' ? 'simulated' : 'live',
   isSimulated: (e: EcsEvent) => e.labels?.provenance === 'simulated',
   dataset:    (e: EcsEvent) => e.event.dataset ?? null,
+  correlation:   (e: EcsEvent) => e.correlation ?? null,
+  isCorrelation: (e: EcsEvent) => Boolean(e.correlation),
 }
