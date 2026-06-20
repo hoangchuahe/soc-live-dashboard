@@ -170,3 +170,19 @@ def test_completion_bumps_entity_risk():
     top = risk.top(5)
     assert top and top[0]["name"] == "HOST-X"
     assert top[0]["score"] >= 59  # ~60 minus tiny decay
+
+
+def test_campaign_director_emits_ordered_chain():
+    from app.simulator import CampaignDirector
+
+    director = CampaignDirector(start_probability=1.0)
+    batches = [director.poll() for _ in range(4)]
+
+    # Stage 1 is a burst of >=5 brute-force events (to trip the threshold rule).
+    assert len(batches[0]) >= 5
+    actions = [b[0]["event"]["action"] for b in batches]
+    assert actions == ["auth_failure", "lateral_movement", "beacon", "anomaly"]
+
+    # Every event in the campaign shares ONE host (the join key).
+    hosts = {ev["host"]["name"] for batch in batches for ev in batch}
+    assert len(hosts) == 1

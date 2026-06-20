@@ -234,6 +234,63 @@ def maybe_event() -> dict | None:
     )
 
 
+# ── Multi-stage attack campaign generator ─────────────────────────────────────
+# Occasionally injects a coherent, ORDERED attack chain — all stages sharing one
+# host.name — so the correlation engine (group-by host.name) can fire. Without
+# this, the random noise above essentially never forms a correlatable sequence.
+
+class CampaignDirector:
+    """Drip-feeds an ordered multi-stage attack across successive polls."""
+
+    def __init__(self, start_probability: float = 0.04) -> None:
+        self._p = start_probability
+        self._pending: list[list[dict]] = []
+
+    def poll(self) -> list[dict]:
+        """Return this tick's campaign events (possibly empty)."""
+        if not self._pending and random.random() < self._p:
+            self._begin()
+        return self._pending.pop(0) if self._pending else []
+
+    def _begin(self) -> None:
+        attacker_ip = random.choice(_ATTACKER_IPS)
+        host = random.choice(_HOSTNAMES)
+        self._pending = [
+            [self._stage_event(attacker_ip, host, "auth_failure") for _ in range(6)],
+            [self._stage_event(attacker_ip, host, "lateral_movement")],
+            [self._stage_event(attacker_ip, host, "beacon")],
+            [self._stage_event(attacker_ip, host, "anomaly")],
+        ]
+
+    def _stage_event(self, attacker_ip: str, host: str, action: str) -> dict:
+        category, outcome, module = ACTION_TEMPLATE[action]
+        tactic, t_id, t_name = ACTION_MITRE[action]
+        geo = random_source()
+        ts = datetime.now(UTC).isoformat()
+        message = ACTION_MESSAGES[action][0].format(
+            count=6, source_country=geo["country"], host=host,
+            dest="-", user="-", process="-",
+        )
+        return make_event(
+            event_id=f"evt-{random.randint(100_000, 999_999)}",
+            timestamp=ts,
+            category=category,
+            action=action,
+            outcome=outcome,
+            severity="high",
+            module=module,
+            message=message,
+            source_ip=attacker_ip,
+            source_country=geo["country"],
+            source_lat=geo["lat"],
+            source_lon=geo["lng"],
+            host_name=host,
+            tactic=tactic,
+            technique_id=t_id,
+            technique_name=t_name,
+        )
+
+
 def get_topology() -> tuple[list[dict], list[dict]]:
     nodes = [
         {"id": "ext-1",    "label": "External",    "type": "external",    "risk": 0.92},
