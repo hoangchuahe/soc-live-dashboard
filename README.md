@@ -41,7 +41,7 @@ RBA risk scoring, Prometheus metrics).
 | **MITRE ATT&CK heatmap** | 13 tactics × event count — events tagged with technique IDs |
 | **Top Risk Entities** | Splunk-style RBA: hosts/IPs ranked by accumulated risk score |
 | **Detection Rules** | Sigma YAML rules + their fire counts, last-fired, threshold flag |
-| **Alert Feed** | Both raw events and rule-driven detections, severity-coded |
+| **Alert Feed** | Raw events, rule-driven detections, and **multi-stage correlated alerts** (kill-chain), severity-coded |
 
 ---
 
@@ -52,6 +52,7 @@ RBA risk scoring, Prometheus metrics).
 | ECS-shaped events                    |      ✓       |     —     |        ✓         |   —   |    —     |
 | Sigma-style YAML detection rules³    |      ✓       |     ✓¹    |        ✓¹        |   —   |    —     |
 | Threshold / sliding-window detection |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
+| Multi-stage correlation              |      ✓       |     ✓     |        ✓         |   ~   |    ✓     |
 | MITRE ATT&CK tagging                 |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
 | Risk-Based Alerting                  |      ✓       |     ✓     |       ~²         |   —   |    ✓     |
 | Real-time push to UI                 |      ✓ (WS)  |   ✓ (XHR) |     ✓ (XHR)      |   ✓   |    ✓     |
@@ -60,13 +61,14 @@ RBA risk scoring, Prometheus metrics).
 | JWT auth + RBAC                      |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
 | Alert lifecycle (ack / close)        |      ✓       |     ✓     |        ✓         |   ✓   |    ✓     |
 | Persistent storage                   |   ✓ SQLite   |  ✓ index  |     ✓ index      | ✓ index | ✓ LA  |
-| Custom query language                |      —       |     SPL   |    KQL/EQL       |   —   |   KQL    |
+| Custom query language                |     ✓⁴       |     SPL   |    KQL/EQL       |   —   |   KQL    |
 | Multi-tenant / RBAC                  |      —       |     ✓     |        ✓         |   ✓   |    ✓     |
 | Distributed ingestion                |      —       |     ✓     |        ✓         |   ✓   |    ✓     |
 
 ¹ via Sigma compilers (`pySigma`, Splunk app)
 ² via Risk Engine in beta
 ³ This project ships 7 example rules — not a comparable corpus to Splunk ESCU's hundreds
+⁴ a substring / field / numeric DSL (`AND`/`OR`/`NOT`) with a Discover view — intentionally simpler than SPL/KQL
 
 The detection-engine, RBA, and ECS pieces are the *substance* — the rest of the
 gap (multi-tenant, distributed) is intentionally out of scope. See
