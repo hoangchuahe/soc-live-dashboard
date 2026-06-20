@@ -221,8 +221,10 @@ grouped by `host.name` within 600 s.
 
 | Feature | File | Notes |
 |---|---|---|
-| Pytest config | `backend/pytest.ini` | Verbose, short tracebacks |
+| Pytest config | `backend/pyproject.toml` | `[tool.pytest.ini_options]`; verbose, short tracebacks |
 | 11 detection-engine tests | `backend/tests/test_detection.py` | Loader, selection, threshold, RBA |
+| 15 correlation tests | `backend/tests/test_correlation.py` | Loader, temporal_ordered engine, campaign + producer integration |
+| 15 per-rule coverage tests | `backend/tests/test_rule_coverage.py` | Each rule fires on a positive sample, silent on a near-miss; meta-test enforces coverage |
 | Test fixtures | `engine` pytest fixture | Fresh engine per test |
 | Time-mocked decay test | `test_risk_decay_brings_score_down` | Forces `last_updated` into past |
 | Per-entity keying test | `test_threshold_keyed_per_entity` | Pins multi-tenant correctness |
