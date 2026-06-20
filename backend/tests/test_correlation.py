@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from app.detection.correlation import (
     CorrelationRule,
     load_correlation_rules,
@@ -81,3 +83,90 @@ def test_loader_skips_bad_type_and_timespan(tmp_path):
     )
     rules = load_correlation_rules({"rule-0001-auth-brute"}, directory=tmp_path)
     assert rules == []
+
+
+from app.detection.correlation import CorrelationEngine  # noqa: E402
+from app.detection.engine import Detection  # noqa: E402
+from app.risk import RiskTracker  # noqa: E402
+
+
+def _corr_rule(timespan=600):
+    return CorrelationRule(
+        id="corr-test", title="Test Chain", description="",
+        type="temporal_ordered",
+        stage_rule_ids=["rule-A", "rule-B", "rule-C"],
+        group_by="host.name", timespan=timespan,
+        severity="critical", risk_weight=60,
+    )
+
+
+def _ev(host="HOST-X"):
+    return {"host": {"name": host}, "event": {"id": "e1"}}
+
+
+def _bd(rule_id):
+    return Detection(
+        rule_id=rule_id, rule_title=rule_id, severity="high",
+        timestamp=datetime.now(UTC).isoformat(), entity="x",
+        technique_id=None, technique_name=None, tactic=None,
+        triggering_event_id="e1", matched_count=1, message="m",
+    )
+
+
+def test_ordered_chain_fires_once():
+    risk = RiskTracker()
+    eng = CorrelationEngine([_corr_rule()], risk)
+    assert eng.ingest(_ev(), [_bd("rule-A")]) == []
+    assert eng.ingest(_ev(), [_bd("rule-B")]) == []
+    out = eng.ingest(_ev(), [_bd("rule-C")])
+    assert len(out) == 1
+    assert out[0].rule_id == "corr-test"
+    assert out[0].entity == "HOST-X"
+    assert [s["rule_id"] for s in out[0].stages] == ["rule-A", "rule-B", "rule-C"]
+
+
+def test_out_of_order_does_not_fire():
+    eng = CorrelationEngine([_corr_rule()], RiskTracker())
+    eng.ingest(_ev(), [_bd("rule-A")])
+    assert eng.ingest(_ev(), [_bd("rule-C")]) == []
+
+
+def test_timespan_exceeded_does_not_fire():
+    clk = {"t": 1000.0}
+    eng = CorrelationEngine([_corr_rule(timespan=300)], RiskTracker(), clock=lambda: clk["t"])
+    eng.ingest(_ev(), [_bd("rule-A")])
+    clk["t"] = 1000.0 + 301
+    eng.ingest(_ev(), [_bd("rule-B")])   # expired -> sequence dropped
+    clk["t"] = 1000.0 + 302
+    assert eng.ingest(_ev(), [_bd("rule-C")]) == []
+
+
+def test_different_group_does_not_fire():
+    eng = CorrelationEngine([_corr_rule()], RiskTracker())
+    eng.ingest(_ev("HOST-X"), [_bd("rule-A")])
+    eng.ingest(_ev("HOST-Y"), [_bd("rule-B")])   # wrong host -> no advance on X
+    assert eng.ingest(_ev("HOST-X"), [_bd("rule-C")]) == []
+
+
+def test_no_refire_after_completion():
+    eng = CorrelationEngine([_corr_rule()], RiskTracker())
+    eng.ingest(_ev(), [_bd("rule-A")])
+    eng.ingest(_ev(), [_bd("rule-B")])
+    assert len(eng.ingest(_ev(), [_bd("rule-C")])) == 1
+    assert eng.ingest(_ev(), [_bd("rule-C")]) == []   # sequence cleared
+
+
+def test_missing_group_field_skips():
+    eng = CorrelationEngine([_corr_rule()], RiskTracker())
+    assert eng.ingest({"event": {"id": "e"}}, [_bd("rule-A")]) == []
+
+
+def test_completion_bumps_entity_risk():
+    risk = RiskTracker()
+    eng = CorrelationEngine([_corr_rule()], risk)
+    eng.ingest(_ev(), [_bd("rule-A")])
+    eng.ingest(_ev(), [_bd("rule-B")])
+    eng.ingest(_ev(), [_bd("rule-C")])
+    top = risk.top(5)
+    assert top and top[0]["name"] == "HOST-X"
+    assert top[0]["score"] >= 59  # ~60 minus tiny decay
