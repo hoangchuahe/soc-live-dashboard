@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-197%20passing-brightgreen.svg)](backend/tests)
+[![Tests](https://img.shields.io/badge/tests-213%20passing-brightgreen.svg)](backend/tests)
 
 **🔗 Live demo:** [soc-live-dashboard.fly.dev](https://soc-live-dashboard.fly.dev) — log in with `admin` / `admin` (admin) or `viewer` / `viewer` (read-only). Runs in simulator mode; data resets on redeploy.
 

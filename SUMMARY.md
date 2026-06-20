@@ -51,8 +51,8 @@ Python 3.12 / FastAPI · React 18 / TypeScript · D3.js v7 · ElasticSearch (opt
 | | |
 |---|---|
 | Source files | ~35 (backend + frontend + rules + tests + docs) |
-| Sigma-style YAML rules | 7 |
-| Tests | 197 passing (171 Pytest + 26 Vitest) |
+| Sigma-style YAML rules | 7 base + 1 correlation |
+| Tests | 213 passing (185 Pytest + 28 Vitest) |
 | MITRE ATT&CK tactics tracked | 13 |
 | Weighted attack-source countries | 14 |
 | Dashboard panels | 9 |

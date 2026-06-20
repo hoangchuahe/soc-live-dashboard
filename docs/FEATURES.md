@@ -65,6 +65,23 @@
 
 ---
 
+## Correlation (multi-stage detection)
+
+| Feature | File | Notes |
+|---|---|---|
+| Correlation rule format | `backend/detections/correlations/*.yml` | Sigma-style `temporal_ordered`: ordered base-rule stages, `group-by`, `timespan` |
+| Correlation engine | `backend/app/detection/correlation.py` | Per-`(rule, entity)` ordered-sequence state above the base engine |
+| Join by re-resolution | `CorrelationEngine.ingest` | `group-by` resolved from each stage's event, decoupled from base `Detection.entity` |
+| Fail-soft loader + validation | `load_correlation_rules` | Skips + warns on unknown stage ids / bad type / bad timespan |
+| Campaign generator | `backend/app/simulator.py` `CampaignDirector` | Injects an ordered brute→lateral→beacon→exfil chain on one host |
+| Correlated alert surfacing | `frontend/src/components/AlertFeed.tsx` | "⛓ MULTI-STAGE" badge + stage chain with technique IDs |
+
+Flagship rule `corr-0001-multistage-intrusion`: `rule-0001-auth-brute` →
+`rule-0003-lateral-rdp` → `rule-0004-c2-beacon` → `rule-0006-exfil-volume`,
+grouped by `host.name` within 600 s.
+
+---
+
 ## Risk-Based Alerting
 
 | Feature | File | Notes |
