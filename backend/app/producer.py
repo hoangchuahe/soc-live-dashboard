@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from . import metrics
-from .detection import DetectionEngine
+from .detection import CorrelationEngine, DetectionEngine
 from .hub import ConnectionHub
 from .sources.base import MetricsProvider, Source
 
@@ -31,6 +31,7 @@ class Producer:
         metrics_provider: MetricsProvider,
         engine: DetectionEngine,
         hub: ConnectionHub,
+        correlation_engine: CorrelationEngine | None = None,
         event_buffer: deque[dict],
         alert_buffer: deque[dict],
         persist_event: _AsyncSink = _default_noop,
@@ -42,6 +43,7 @@ class Producer:
         self._sources = list(sources)
         self._metrics = metrics_provider
         self._engine = engine
+        self._correlation = correlation_engine
         self._hub = hub
         self._event_buffer = event_buffer
         self._alert_buffer = alert_buffer
@@ -104,11 +106,19 @@ class Producer:
             severity=ev.get("severity", "low"),
         )
         fired: list[dict] = []
-        for det in self._engine.evaluate(event):
+        base_dets = self._engine.evaluate(event)
+        for det in base_dets:
             alert = det.to_ecs()
             fired.append(alert)
             self._alert_buffer.append(alert)
             metrics.detections_fired.inc(rule_id=det.rule_id, tactic=det.tactic or "unknown")
+
+        if self._correlation is not None:
+            for cdet in self._correlation.ingest(event, base_dets):
+                calert = cdet.to_ecs()
+                fired.append(calert)
+                self._alert_buffer.append(calert)
+                metrics.detections_fired.inc(rule_id=cdet.rule_id, tactic="correlation")
 
         asyncio.create_task(self._persist(event))
         asyncio.create_task(self._index(event))

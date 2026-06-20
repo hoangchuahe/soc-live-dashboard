@@ -215,3 +215,51 @@ def test_campaign_produces_one_correlated_detection():
         "rule-0004-c2-beacon",
         "rule-0006-exfil-volume",
     ]
+
+
+def test_producer_emits_correlated_alerts():
+    """_process_event surfaces a correlated alert (with a 'correlation' block)
+    once the campaign chain completes."""
+    import asyncio
+    from collections import deque
+
+    from app.detection import DetectionEngine, load_rules
+    from app.detection.correlation import CorrelationEngine, load_correlation_rules
+    from app.producer import Producer
+    from app.simulator import CampaignDirector
+
+    class _Hub:
+        async def broadcast(self, frame):  # not used by _process_event
+            return None
+
+    class _Metrics:
+        name = "test.metrics"
+        def read(self):
+            return {}
+
+    async def run():
+        risk = RiskTracker()
+        engine = DetectionEngine(load_rules(), risk)
+        corr = CorrelationEngine(load_correlation_rules({r.id for r in engine.rules}), risk)
+        producer = Producer(
+            sources=[],
+            metrics_provider=_Metrics(),
+            engine=engine,
+            hub=_Hub(),
+            event_buffer=deque(maxlen=500),
+            alert_buffer=deque(maxlen=200),
+            correlation_engine=corr,
+        )
+        director = CampaignDirector(start_probability=1.0)
+        fired = []
+        for _ in range(4):
+            for ev in director.poll():
+                fired += producer._process_event(ev)
+        await asyncio.sleep(0)   # let scheduled noop persist/index tasks drain
+        return fired
+
+    fired = asyncio.run(run())
+    correlated = [a for a in fired if "correlation" in a]
+    assert len(correlated) == 1
+    assert correlated[0]["correlation"]["rule_id"] == "corr-0001-multistage-intrusion"
+    assert correlated[0]["event"]["kind"] == "alert"
