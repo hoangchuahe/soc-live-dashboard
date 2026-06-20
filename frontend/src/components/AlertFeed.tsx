@@ -44,6 +44,11 @@ export function AlertFeed({ events, onPivot }: Props) {
                     ALERT
                   </span>
                 )}
+                {ecs.isCorrelation(e) && (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40">
+                    ⛓ MULTI-STAGE
+                  </span>
+                )}
                 {ecs.isSimulated(e) && <SimChip />}
                 {ecs.technique(e) && (
                   <span className="text-[9px] font-mono text-purple-400">{ecs.technique(e)}</span>
@@ -65,6 +70,18 @@ export function AlertFeed({ events, onPivot }: Props) {
               {e.rule?.name ?? ecs.type(e)}
             </div>
             <div className="text-[11px] text-slate-500 truncate">{e.message}</div>
+            {ecs.correlation(e) && (
+              <div className="text-[10px] text-slate-500 mt-1 flex flex-wrap gap-x-1">
+                {ecs.correlation(e)!.stages.map((s, i) => (
+                  <span key={s.rule_id + i} className="whitespace-nowrap">
+                    {i > 0 && <span className="text-slate-600">→ </span>}
+                    <span className="text-slate-400">{i + 1}/{ecs.correlation(e)!.stages.length}</span>{' '}
+                    {s.title}
+                    {s.technique_id && <span className="text-purple-400 ml-0.5">({s.technique_id})</span>}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="text-[10px] text-slate-600 mt-0.5">
               {ecs.source(e)}{ecs.dest(e) ? ` → ${ecs.dest(e)}` : ''}
             </div>

@@ -1,0 +1,17 @@
+title: Multi-Stage Intrusion
+id: corr-0001-multistage-intrusion
+description: >
+  Brute force -> lateral movement -> C2 beacon -> data exfiltration observed on
+  a single host within ten minutes. A textbook intrusion kill chain.
+author: Pham Nhat Hoang
+correlation:
+  type: temporal_ordered
+  rules:
+    - rule-0001-auth-brute
+    - rule-0003-lateral-rdp
+    - rule-0004-c2-beacon
+    - rule-0006-exfil-volume
+  group-by: host.name
+  timespan: 600
+severity: critical
+risk_weight: 60

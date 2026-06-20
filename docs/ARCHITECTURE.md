@@ -17,6 +17,7 @@
 └──────┬──────────────────┘
        │
        ├──► Detection (event.kind=alert) ──► RiskTracker.bump(entity, weight)
+       │         └──► CorrelationEngine.ingest(event, dets) ──► CorrelatedDetection
        │                                            │
        │                                            ▼
        │                                   exponential-decay risk score
@@ -53,6 +54,18 @@ signals contribute risk weight to the offending entity (host / user / IP); the
 *entity* crosses an alert threshold, not the rule. The dashboard implements the
 core mechanic — `RiskTracker.bump(entity, weight)` — and decays scores
 exponentially with a 30-minute half-life so transient noise fades.
+
+### Correlation (multi-stage detection)
+
+Base rules are single-event/threshold. A `CorrelationEngine` sits above them and
+recognises an ordered sequence of base-rule fires for one entity within a window
+(`temporal_ordered`, mirroring Sigma correlation + Splunk RBA). It consumes the
+base `Detection`s plus the triggering event — re-resolving the `group-by` field
+from the event so stages keyed differently by their base rules still correlate on
+a common field (`host.name`). On completion it emits one higher-severity
+`CorrelatedDetection` referencing its child stages. State is in-process per
+`(correlation_rule, entity)`; it would move to Redis/Flink for horizontal scale,
+exactly like the base engine.
 
 ### ECS schema everywhere
 
